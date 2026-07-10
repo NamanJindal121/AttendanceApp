@@ -1,0 +1,28 @@
+# systemd unit for the LAN-side attendance poller (plan §C2 fallback).
+#
+# Install on an always-on office machine (PC/NAS/Raspberry Pi):
+#   sudo cp attendance-bridge.service /etc/systemd/system/
+#   sudo mkdir -p /var/lib/attendance-bridge
+#   sudo cp .env.example /etc/attendance-bridge.env   # then edit real values
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now attendance-bridge
+#
+# Logs:  journalctl -u attendance-bridge -f
+
+[Unit]
+Description=Attendance biometric poller (pyzk -> PocketBase)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/attendance-bridge.env
+ExecStart=/usr/bin/python3 /opt/attendance-bridge/poller.py
+Restart=always
+RestartSec=10
+# Harden a little.
+NoNewPrivileges=true
+StateDirectory=attendance-bridge
+
+[Install]
+WantedBy=multi-user.target

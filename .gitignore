@@ -1,0 +1,19 @@
+# PocketBase runtime data (SQLite DB, uploaded selfies, generated types)
+backend/pb_data/
+backend/pb.log
+backend/*.zip
+# Platform-specific binary — download per-OS (see backend note / setup-ec2.sh)
+backend/pocketbase
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/*.log
+
+# Bridge
+bridge/.env
+bridge/poller_state.json
+bridge/__pycache__/
+
+# OS
+.DS_Store
