@@ -22,7 +22,8 @@ instance in Step 4. No local bundling needed.
 Console → EC2 → Launch instance:
 - **Name:** attendance
 - **AMI:** Ubuntu Server 24.04 LTS
-- **Type:** t3.small
+- **Type:** t3.micro (cheapest; add swap in Step 4 so the build doesn't OOM) or
+  t3.small (2 GB RAM, no swap needed)
 - **Key pair:** `<KEYPAIR>`
 - **Network / Security group:** create one allowing inbound:
   - SSH (22) — **My IP** only
@@ -82,6 +83,12 @@ ssh -i <KEYPAIR>.pem ubuntu@<ELASTIC_IP>
 
 On the instance:
 ```bash
+# t3.micro only (1 GB RAM): add swap so the frontend build won't get OOM-killed.
+# Skip on t3.small or larger.
+sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
 git clone https://github.com/NamanJindal121/AttendanceApp.git
 cd AttendanceApp
 sudo bash deploy/setup-ec2.sh attendance.mycompany.com
