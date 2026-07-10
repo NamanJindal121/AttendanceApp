@@ -10,16 +10,10 @@ Replace these placeholders throughout:
 
 ---
 
-## Step 0 — Get the app files onto the AWS machine
+## Step 0 — (nothing to prep locally)
 
-Copy this whole project folder to the AWS machine (git clone, scp, or a zip).
-You specifically need: `backend/pb_hooks/`, `backend/pb_migrations/`,
-`frontend/dist/`, and `deploy/`.
-
-If `frontend/dist/` didn't come along, rebuild it on any machine with Node:
-```bash
-cd frontend && npm install && npm run build
-```
+The code is on GitHub and `setup-ec2.sh` clones + builds everything on the
+instance in Step 4. No local bundling needed.
 
 ---
 
@@ -80,29 +74,23 @@ TLS in Step 5 will fail until this resolves.
 
 ---
 
-## Step 4 — Copy app files to the instance + run setup
+## Step 4 — SSH in, clone, and run setup
 
-From the AWS machine (where the project folder lives):
 ```bash
-EIP=<ELASTIC_IP>
-# Bundle exactly what the instance needs (run from the project root)
-tar czf app.tar.gz backend/pb_hooks backend/pb_migrations frontend/dist deploy
-
-scp -i <KEYPAIR>.pem app.tar.gz ubuntu@${EIP}:/tmp/
-ssh -i <KEYPAIR>.pem ubuntu@${EIP}
+ssh -i <KEYPAIR>.pem ubuntu@<ELASTIC_IP>
 ```
 
-Now on the instance:
+On the instance:
 ```bash
-cd /tmp && tar xzf app.tar.gz
-# Stage the files the script expects side-by-side:
-mkdir -p ~/stage && cd ~/stage
-cp -r /tmp/backend/pb_hooks /tmp/backend/pb_migrations /tmp/frontend/dist /tmp/deploy/* .
-sudo bash setup-ec2.sh attendance.mycompany.com
+git clone https://github.com/NamanJindal121/AttendanceApp.git
+cd AttendanceApp
+sudo bash deploy/setup-ec2.sh attendance.mycompany.com
 ```
 
-The script installs Nginx + the Linux PocketBase binary, applies migrations,
-deploys the static app, gets a Let's Encrypt cert, and starts everything.
+The script installs Nginx + Node, **builds the frontend**, downloads the Linux
+PocketBase binary, applies migrations, deploys the static app, obtains a Let's
+Encrypt cert, and starts everything. Watch its output — it prints the next two
+commands (device secret + superuser) at the end.
 
 ---
 

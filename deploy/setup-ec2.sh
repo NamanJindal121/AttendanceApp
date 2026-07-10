@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# One-time provisioning script for a fresh Ubuntu EC2 instance.
-# Run with sudo ON the instance, from a dir containing:
-#   pb_hooks/  pb_migrations/  dist/  nginx.conf  pocketbase.service
+# One-time provisioning for a fresh Ubuntu EC2 instance.
+# Run with sudo from the ROOT of the cloned repo:
 #
-# Usage:  sudo bash setup-ec2.sh <domain> [pocketbase_version]
-# Example: sudo bash setup-ec2.sh attendance.mycompany.com 0.28.4
+#   git clone https://github.com/NamanJindal121/AttendanceApp.git
+#   cd AttendanceApp
+#   sudo bash deploy/setup-ec2.sh <domain> [pocketbase_version]
 #
-# Prereqs (see deploy/README.md):
+# Example: sudo bash deploy/setup-ec2.sh attendance.mycompany.com 0.28.4
+#
+# Prereqs (see deploy/RUNBOOK.md):
 #   - EC2 launched, Elastic IP associated, security group opens 80/443/22
 #   - DNS A record for <domain> -> the Elastic IP (must resolve before TLS step)
 set -euo pipefail
@@ -16,16 +18,23 @@ WEB_DIR=/var/www/attendance
 DOMAIN="${1:?Usage: setup-ec2.sh <domain> [pb_version]}"
 PB_VERSION="${2:-0.28.4}"
 
+# Resolve the repo root (this script lives in deploy/).
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo ">> Installing packages"
 apt-get update
-apt-get install -y nginx certbot python3-certbot-nginx unzip zip awscli curl
+apt-get install -y nginx certbot python3-certbot-nginx unzip zip awscli curl nodejs npm
+
+echo ">> Building the frontend (static PWA)"
+# dist/ is not committed, so build it here. npm run build needs the webcrypto
+# flag on the Node shipped with Ubuntu; the package.json build script sets it.
+( cd "${REPO_ROOT}/frontend" && npm ci && npm run build )
 
 echo ">> Creating pocketbase user + dirs"
 id pocketbase &>/dev/null || useradd --system --home "${APP_DIR}" --shell /usr/sbin/nologin pocketbase
 mkdir -p "${APP_DIR}/pb_data" "${WEB_DIR}" /var/www/certbot
 
 echo ">> Downloading the Linux PocketBase binary (v${PB_VERSION})"
-# The dev binary is macOS; the instance needs the matching Linux build.
 ARCH="$(uname -m)"
 case "${ARCH}" in
   x86_64)  PB_ARCH=amd64 ;;
@@ -38,18 +47,18 @@ unzip -o "${TMP_ZIP}" pocketbase -d "${APP_DIR}"
 chmod +x "${APP_DIR}/pocketbase"
 
 echo ">> Installing hooks + migrations"
-cp -r ./pb_hooks "${APP_DIR}/"
-cp -r ./pb_migrations "${APP_DIR}/"
+cp -r "${REPO_ROOT}/backend/pb_hooks" "${APP_DIR}/"
+cp -r "${REPO_ROOT}/backend/pb_migrations" "${APP_DIR}/"
 chown -R pocketbase:pocketbase "${APP_DIR}"
 
 echo ">> Applying migrations"
 sudo -u pocketbase "${APP_DIR}/pocketbase" migrate up --dir="${APP_DIR}/pb_data"
 
 echo ">> Installing static frontend"
-cp -r ./dist/* "${WEB_DIR}/"
+cp -r "${REPO_ROOT}/frontend/dist/"* "${WEB_DIR}/"
 
 echo ">> Installing systemd service"
-cp ./pocketbase.service /etc/systemd/system/
+cp "${REPO_ROOT}/deploy/pocketbase.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now pocketbase
 
@@ -81,12 +90,13 @@ echo ">> Obtaining TLS certificate"
 if certbot certonly --webroot -w /var/www/certbot -d "${DOMAIN}" \
      --non-interactive --agree-tos -m "admin@${DOMAIN}"; then
   echo ">> Installing the full SSL nginx site"
-  sed "s/attendance.example.com/${DOMAIN}/g" ./nginx.conf > /etc/nginx/sites-available/attendance
+  sed "s/attendance.example.com/${DOMAIN}/g" "${REPO_ROOT}/deploy/nginx.conf" \
+    > /etc/nginx/sites-available/attendance
   nginx -t && systemctl reload nginx
 else
-  echo "!! certbot failed — check the DNS A record for ${DOMAIN} resolves to this host, then re-run:"
+  echo "!! certbot failed — check the DNS A record for ${DOMAIN} resolves here, then re-run:"
   echo "   sudo certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN}"
-  echo "   sudo sed 's/attendance.example.com/${DOMAIN}/g' ./nginx.conf > /etc/nginx/sites-available/attendance && sudo nginx -t && sudo systemctl reload nginx"
+  echo "   sudo sed 's/attendance.example.com/${DOMAIN}/g' ${REPO_ROOT}/deploy/nginx.conf > /etc/nginx/sites-available/attendance && sudo nginx -t && sudo systemctl reload nginx"
 fi
 
 echo ""
