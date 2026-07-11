@@ -37,14 +37,18 @@ export function groupByDay(records) {
 //   settings: has work_days (array of 0-6) and late_grace_minutes
 //   today: Date for "future day" detection
 //
-// Returns { status, late, noCheckout } where status is one of:
-//   "present" | "absent" | "off" (non-working day) | "future" | "no-record-off"
+// Returns { status, late, lateBy, noCheckout } where status is one of:
+//   "present" | "absent" | "off" (non-working day) | "future"
+// and lateBy is the number of minutes past (scheduled + grace), 0 if on time.
 export function dayStatus(dateStr, dayRecords, employee, settings, today) {
   const date = new Date(dateStr + "T00:00:00");
   const weekday = date.getDay(); // 0=Sun..6=Sat
-  const workDays = Array.isArray(settings?.work_days)
-    ? settings.work_days
-    : [1, 2, 3, 4, 5, 6];
+  // Per-employee work_days override the office-wide default when set.
+  const workDays = Array.isArray(employee?.work_days) && employee.work_days.length
+    ? employee.work_days
+    : Array.isArray(settings?.work_days)
+      ? settings.work_days
+      : [1, 2, 3, 4, 5, 6];
   const isWorkDay = workDays.includes(weekday);
 
   const records = dayRecords || [];
@@ -56,29 +60,41 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
   // Future day: don't judge it yet.
   const todayKey = dayKey(today);
   if (dateStr > todayKey) {
-    return { status: "future", late: false, noCheckout: false };
+    return { status: "future", late: false, lateBy: 0, noCheckout: false };
   }
 
   if (checkIns.length > 0) {
     // Present. Late if the FIRST check-in is > grace minutes after schedule.
-    let late = false;
+    let lateBy = 0;
     const sched = parseHHMM(employee?.scheduled_check_in);
     const grace = Number(settings?.late_grace_minutes ?? 10);
     if (sched !== null) {
       const first = new Date(checkIns[0].timestamp);
       const firstMin = first.getHours() * 60 + first.getMinutes();
-      late = firstMin > sched + grace;
+      // Minutes past the scheduled start (not counting grace) — used to display.
+      const over = firstMin - sched;
+      if (over > grace) lateBy = over;
     }
     const noCheckout = checkOuts.length === 0;
-    return { status: "present", late, noCheckout };
+    return { status: "present", late: lateBy > 0, lateBy, noCheckout };
   }
 
   // No check-in: absent on a work day, neutral otherwise.
   return {
     status: isWorkDay ? "absent" : "off",
     late: false,
+    lateBy: 0,
     noCheckout: false,
   };
+}
+
+// Format a lateBy minute count as "Late by 1h 15m" / "Late by 25m".
+export function formatLateBy(minutes) {
+  if (!minutes || minutes <= 0) return "";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0) return `Late by ${h}h${m > 0 ? " " + m + "m" : ""}`;
+  return `Late by ${m}m`;
 }
 
 // Build the weeks grid (array of weeks, each 7 cells; leading/trailing null pads)

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { dayKey, groupByDay, dayStatus, monthGrid } from "./attendance";
+import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy } from "./attendance";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -83,7 +83,7 @@ export default function Calendar({ records, employee, settings, today = new Date
                 <span className="cal-daynum">{cell.getDate()}</span>
                 {s.status === "present" && (
                   <span className="cal-tag">
-                    {s.late ? "Late" : "Present"}
+                    {s.late ? formatLateBy(s.lateBy) : "Present"}
                     {s.noCheckout && <span className="cal-nocheckout" title="No check-out">*</span>}
                   </span>
                 )}
@@ -107,7 +107,10 @@ export default function Calendar({ records, employee, settings, today = new Date
 
 function label(s) {
   if (s.status === "present") {
-    return "Present" + (s.late ? " (late)" : "") + (s.noCheckout ? " — no check-out" : "");
+    return (
+      (s.late ? formatLateBy(s.lateBy) : "Present") +
+      (s.noCheckout ? " — no check-out" : "")
+    );
   }
   if (s.status === "absent") return "Absent";
   if (s.status === "off") return "Non-working day";

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { pb } from "../../pb";
 
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 const BLANK = {
   email: "",
   full_name: "",
@@ -10,7 +12,36 @@ const BLANK = {
   password: "",
   scheduled_check_in: "09:00",
   scheduled_check_out: "18:00",
+  work_days: [], // empty = inherit office default
 };
+
+// Compact working-day picker. `days` is an array of weekday numbers (0-6);
+// onChange gets the new array. Empty array means "use office default".
+function DayPicker({ days, onChange }) {
+  const set = Array.isArray(days) ? days : [];
+  return (
+    <div className="day-toggles">
+      {DAY_LABELS.map((d, i) => {
+        const on = set.includes(i);
+        return (
+          <button
+            type="button"
+            key={i}
+            className={`day-toggle sm ${on ? "on" : ""}`}
+            title={on ? "Working day" : "Off"}
+            onClick={() =>
+              onChange(
+                on ? set.filter((x) => x !== i) : [...set, i].sort()
+              )
+            }
+          >
+            {d[0]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Employees() {
   const [list, setList] = useState([]);
@@ -59,6 +90,7 @@ export default function Employees() {
         role: editing.role,
         scheduled_check_in: editing.scheduled_check_in,
         scheduled_check_out: editing.scheduled_check_out,
+        work_days: Array.isArray(editing.work_days) ? editing.work_days : [],
       });
       setEditing(null);
       load();
@@ -110,6 +142,13 @@ export default function Employees() {
             }
           />
         </label>
+        <label className="field">
+          Work days <span className="muted-inline">(none = office default)</span>
+          <DayPicker
+            days={form.work_days}
+            onChange={(wd) => setForm({ ...form, work_days: wd })}
+          />
+        </label>
         <select
           value={form.role}
           onChange={(e) => setForm({ ...form, role: e.target.value })}
@@ -136,6 +175,7 @@ export default function Employees() {
             <th>Email</th>
             <th>Biometric ID</th>
             <th>Schedule</th>
+            <th>Work days</th>
             <th>Role</th>
             <th>Active</th>
             <th></th>
@@ -190,6 +230,12 @@ export default function Employees() {
                   />
                 </td>
                 <td>
+                  <DayPicker
+                    days={editing.work_days}
+                    onChange={(wd) => setEditing({ ...editing, work_days: wd })}
+                  />
+                </td>
+                <td>
                   <select
                     value={editing.role}
                     onChange={(e) =>
@@ -217,6 +263,11 @@ export default function Employees() {
                   {emp.scheduled_check_in || "—"}
                   {emp.scheduled_check_in ? " – " : ""}
                   {emp.scheduled_check_out || ""}
+                </td>
+                <td>
+                  {Array.isArray(emp.work_days) && emp.work_days.length
+                    ? emp.work_days.map((d) => DAY_LABELS[d][0]).join(" ")
+                    : <span className="muted">default</span>}
                 </td>
                 <td>{emp.role}</td>
                 <td>
