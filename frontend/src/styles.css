@@ -23,6 +23,8 @@ html,
 body {
   margin: 0;
   height: 100%;
+  max-width: 100%;
+  overflow-x: hidden; /* no page-level horizontal scroll, ever */
 }
 
 body {
@@ -30,13 +32,21 @@ body {
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden; /* guard against accidental horizontal scroll on mobile */
+}
+
+/* The app shell should never be wider than the screen. Children opt into
+   horizontal scroll locally (e.g. .table-wrap) rather than the whole page. */
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .screen {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .center {
@@ -158,6 +168,10 @@ select {
   font-size: 1rem;
   background: #fff;
   transition: border-color 0.15s, box-shadow 0.15s;
+  /* Native date/time inputs carry a large intrinsic min-width on mobile that
+     can push containers past the viewport. Let them shrink to their box. */
+  min-width: 0;
+  max-width: 100%;
 }
 input:focus,
 select:focus {
@@ -710,6 +724,22 @@ button {
   .topbar {
     gap: 0.4rem;
     padding: 0.7rem 0.85rem;
+    max-width: 100%;
+  }
+  /* List rows (history, day-punches): let content shrink + wrap so long
+     emails/timestamps never force the page wider than the screen. */
+  .row {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .row .ts,
+  .row .label-full {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .list {
+    padding: 0.85rem;
   }
   /* Hide link text on mobile, show just icons in the top bar */
   .topbar .link .label {
