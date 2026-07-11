@@ -23,7 +23,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo ">> Installing packages"
 apt-get update
-apt-get install -y nginx certbot python3-certbot-nginx unzip zip awscli curl nodejs npm
+# NB: awscli is intentionally omitted — it's not an apt package on Ubuntu 24.04
+# (noble) and is only needed for the optional S3 backup. Install it separately
+# with `sudo snap install aws-cli --classic` if/when you set up backups.
+apt-get install -y nginx certbot python3-certbot-nginx unzip zip curl nodejs npm
 
 echo ">> Building the frontend (static PWA)"
 # dist/ is not committed, so build it here. npm run build needs the webcrypto
