@@ -40,6 +40,8 @@ export default function Settings() {
         radius_meters: Number(rec.radius_meters),
         max_gps_accuracy_meters: Number(rec.max_gps_accuracy_meters),
         require_selfie: !!rec.require_selfie,
+        work_days: Array.isArray(rec.work_days) ? rec.work_days : [1, 2, 3, 4, 5, 6],
+        late_grace_minutes: Number(rec.late_grace_minutes ?? 10),
       });
       setSaved(true);
     } catch (err) {
@@ -93,6 +95,40 @@ export default function Settings() {
           onChange={(e) => set("require_selfie", e.target.checked)}
         />
         Require a selfie at check-in
+      </label>
+
+      <div className="field">
+        <span>Working days</span>
+        <div className="day-toggles">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => {
+            const days = Array.isArray(rec.work_days) ? rec.work_days : [];
+            const on = days.includes(i);
+            return (
+              <button
+                type="button"
+                key={i}
+                className={`day-toggle ${on ? "on" : ""}`}
+                onClick={() => {
+                  const next = on
+                    ? days.filter((x) => x !== i)
+                    : [...days, i].sort();
+                  set("work_days", next);
+                }}
+              >
+                {d}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <label>
+        Late grace period (minutes)
+        <input
+          type="number"
+          value={rec.late_grace_minutes ?? 10}
+          onChange={(e) => set("late_grace_minutes", e.target.value)}
+        />
       </label>
 
       <button onClick={save}>Save</button>

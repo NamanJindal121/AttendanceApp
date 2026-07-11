@@ -72,6 +72,7 @@ export default function CheckIn() {
       <header className="topbar">
         <span className="brand">{user.full_name || user.email}</span>
         <div className="spacer" />
+        <Link to="/calendar" className="link">Calendar</Link>
         <Link to="/history" className="link">History</Link>
         {isAdmin && <Link to="/admin" className="link">Admin</Link>}
         <button className="link" onClick={logout}>Sign out</button>

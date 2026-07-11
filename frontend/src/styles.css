@@ -425,3 +425,168 @@ button:disabled {
 .checkbox input {
   width: auto;
 }
+
+/* form field wrapper used in inline forms/filters */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #475569;
+}
+.muted-inline {
+  color: var(--gray);
+  font-size: 0.85rem;
+  align-self: center;
+}
+tr.editing td {
+  background: #f8fafc;
+}
+
+/* working-day toggles */
+.day-toggles {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.day-toggle {
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: #e5e7eb;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.day-toggle.on {
+  background: var(--blue);
+  color: #fff;
+}
+
+/* -------------------------------------------------------------- calendar */
+.calendar {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  max-width: 760px;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+}
+.cal-summary {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+}
+.chip.present {
+  background: #dcfce7;
+  color: var(--green-dark);
+}
+.chip.late {
+  background: #fef3c7;
+  color: #b45309;
+}
+.chip.absent {
+  background: #fee2e2;
+  color: var(--red-dark);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-dow {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  padding-bottom: 0.25rem;
+}
+.cal-cell {
+  min-height: 56px;
+  border-radius: 8px;
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: #f8fafc;
+  border: 1px solid transparent;
+}
+.cal-cell.empty {
+  background: transparent;
+}
+.cal-cell.present {
+  background: #dcfce7;
+}
+.cal-cell.present.is-late {
+  background: #fef3c7;
+}
+.cal-cell.absent {
+  background: #fee2e2;
+}
+.cal-cell.off {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+.cal-cell.future {
+  background: #fff;
+  border: 1px dashed #e5e7eb;
+}
+.cal-cell.is-today {
+  border: 2px solid var(--blue);
+}
+.cal-daynum {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cal-tag {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #334155;
+}
+.cal-nocheckout {
+  color: var(--red);
+  font-weight: 800;
+}
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+  font-size: 0.75rem;
+  color: var(--gray);
+  align-items: center;
+}
+.cal-legend .dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+.dot.present {
+  background: #dcfce7;
+}
+.dot.is-late {
+  background: #fef3c7;
+}
+.dot.absent {
+  background: #fee2e2;
+}
+.dot.off {
+  background: #f1f5f9;
+}

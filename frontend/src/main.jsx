@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth";
 import Login from "./pages/Login";
 import CheckIn from "./pages/CheckIn";
 import History from "./pages/History";
+import MyCalendar from "./pages/MyCalendar";
 import AdminHome from "./pages/admin/AdminHome";
 import "./styles.css";
 
@@ -32,6 +33,14 @@ function App() {
         element={
           <RequireAuth>
             <History />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <RequireAuth>
+            <MyCalendar />
           </RequireAuth>
         }
       />

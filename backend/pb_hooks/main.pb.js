@@ -37,11 +37,25 @@ onRecordCreateRequest((e) => {
 
   const record = e.record;
 
-  // The authenticated employee IS the subject; timestamp is the server clock.
-  // Force these regardless of what the client sent so nothing can be forged.
   if (!e.auth) {
     throw new ForbiddenError("Authentication required.");
   }
+
+  // Admins / superusers creating records manually (corrections, seeding, or the
+  // biometric bridge) skip the geofence entirely. The check honours whatever
+  // employee/type/timestamp/source they supply. Regular employees fall through
+  // to the enforced app-check-in path below.
+  const isPrivileged =
+    e.auth.collection().name === "_superusers" ||
+    e.auth.get("role") === "admin";
+  if (isPrivileged) {
+    if (!record.get("source")) record.set("source", "app");
+    e.next();
+    return;
+  }
+
+  // The authenticated employee IS the subject; timestamp is the server clock.
+  // Force these regardless of what the client sent so nothing can be forged.
   record.set("employee", e.auth.id);
   record.set("timestamp", new DateTime()); // now
   record.set("source", "app");

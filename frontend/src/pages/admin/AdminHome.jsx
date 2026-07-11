@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Employees from "./Employees";
 import Report from "./Report";
 import Settings from "./Settings";
+import AttendanceCalendar from "./AttendanceCalendar";
 
 export default function AdminHome() {
   const loc = useLocation();
@@ -23,11 +24,13 @@ export default function AdminHome() {
       </header>
       <nav className="tabs">
         {tab("/admin", "Report")}
+        {tab("/admin/calendar", "Calendar")}
         {tab("/admin/employees", "Employees")}
         {tab("/admin/settings", "Settings")}
       </nav>
       <Routes>
         <Route index element={<Report />} />
+        <Route path="calendar" element={<AttendanceCalendar />} />
         <Route path="employees" element={<Employees />} />
         <Route path="settings" element={<Settings />} />
       </Routes>
