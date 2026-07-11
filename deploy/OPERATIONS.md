@@ -150,8 +150,24 @@ Start / Stop.
 The site is back ~1–2 min after Start (wait for Status checks 2/2). No redeploy
 needed — PocketBase + Nginx auto-start on boot.
 
-> Optional automatic nightly stop/start via EventBridge Scheduler is documented
-> in `deploy/RUNBOOK.md` §6. Not set up yet.
+### Automatic nightly stop/start (ACTIVE)
+
+The instance stops and starts automatically via **EventBridge Scheduler**
+(region ap-south-1), so it only runs during working hours:
+
+| Schedule | Cron (Asia/Kolkata) | Action |
+|----------|--------------------|--------|
+| `attendance-start` | `cron(30 8 * * ? *)` — 08:30 IST daily | StartInstances |
+| `attendance-stop`  | `cron(0 23 * * ? *)` — 23:00 IST daily | StopInstances |
+
+- Both use IAM role **`attendance-scheduler`** (trust: `scheduler.amazonaws.com`,
+  inline policy: `ec2:StartInstances`/`ec2:StopInstances`).
+- Target input: `{ "InstanceIds": ["<instance-id>"] }`.
+- **The site is intentionally DOWN 23:00–08:30 IST.** Check-ins can't happen and
+  the biometric device (once connected) must buffer/retry across that gap.
+- To change hours: EventBridge Scheduler → edit the cron on either schedule.
+- To pause auto-shutdown temporarily: disable both schedules (keeps the instance
+  in whatever state it's currently in).
 
 ---
 
