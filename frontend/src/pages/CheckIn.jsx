@@ -42,6 +42,16 @@ export default function CheckIn() {
     })();
   }, [user.id]);
 
+  // Turn an error into a user-facing message. A PocketBase network failure
+  // (server unreachable) comes back as status 0 — which, given the nightly
+  // shutdown, almost always means attendance is closed for the night.
+  const errorMessage = (err) => {
+    if (err?.status === 0 || err?.isAbort) {
+      return "Attendance is closed right now (open 8:30 AM – 11:00 PM). Please try during working hours.";
+    }
+    return err?.response?.message || err?.message || "Something went wrong.";
+  };
+
   // Send the record. `selfie` (a Blob) is attached only when provided.
   const submit = async (pos, selfie) => {
     setStatus({ kind: "working", msg: "Submitting…" });
@@ -61,9 +71,7 @@ export default function CheckIn() {
         msg: `${nextType === "check_in" ? "Checked in" : "Checked out"} successfully.`,
       });
     } catch (err) {
-      const msg =
-        err?.response?.message || err?.message || "Something went wrong.";
-      setStatus({ kind: "error", msg });
+      setStatus({ kind: "error", msg: errorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -84,9 +92,7 @@ export default function CheckIn() {
         await submit(pos, null);
       }
     } catch (err) {
-      const msg =
-        err?.response?.message || err?.message || "Something went wrong.";
-      setStatus({ kind: "error", msg });
+      setStatus({ kind: "error", msg: errorMessage(err) });
       setBusy(false);
     }
   };
