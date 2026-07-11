@@ -79,6 +79,7 @@ export default function Report() {
             <th>Type</th>
             <th>Time</th>
             <th>Source</th>
+            <th>Photo</th>
           </tr>
         </thead>
         <tbody>
@@ -91,11 +92,28 @@ export default function Report() {
                 <span className={`source ${r.source}`}>{r.source}</span>
                 {r.flagged && <span className="flag">flagged</span>}
               </td>
+              <td>
+                {r.selfie ? (
+                  <a
+                    href={pb.files.getURL(r, r.selfie)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <img
+                      className="selfie-thumb"
+                      src={pb.files.getURL(r, r.selfie, { thumb: "100x100" })}
+                      alt="check-in selfie"
+                    />
+                  </a>
+                ) : (
+                  <span className="muted-inline">—</span>
+                )}
+              </td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={4} className="muted">No records in range.</td>
+              <td colSpan={5} className="muted">No records in range.</td>
             </tr>
           )}
         </tbody>

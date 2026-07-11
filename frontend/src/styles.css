@@ -799,3 +799,73 @@ button {
     font-size: 1.3rem;
   }
 }
+
+/* ============================================================== camera modal */
+.cam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+.cam-modal {
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  width: min(440px, 100%);
+  box-shadow: var(--shadow-md);
+}
+.cam-stage {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* mirror the live preview so it feels like a mirror (selfie) */
+  transform: scaleX(-1);
+}
+.cam-controls {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  background: #0f172a;
+  justify-content: center;
+}
+.cam-controls button {
+  flex: 1;
+  max-width: 180px;
+}
+.cam-controls button.ghost {
+  background: #334155;
+}
+.cam-controls button.ghost:hover:not(:disabled) {
+  background: #475569;
+}
+.cam-controls .error {
+  flex: 1;
+  align-self: center;
+  margin: 0;
+}
+
+/* selfie thumbnails in admin tables/lists */
+.selfie-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  cursor: zoom-in;
+  display: block;
+}
+.selfie-thumb:hover {
+  border-color: var(--blue);
+}

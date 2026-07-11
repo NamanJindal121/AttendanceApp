@@ -157,6 +157,19 @@ export default function AttendanceCalendar() {
                   {new Date(r.timestamp).toLocaleTimeString()}
                 </span>
                 <span className={`source ${r.source}`}>{r.source}</span>
+                {r.selfie && (
+                  <a
+                    href={pb.files.getURL(r, r.selfie)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <img
+                      className="selfie-thumb"
+                      src={pb.files.getURL(r, r.selfie, { thumb: "100x100" })}
+                      alt="selfie"
+                    />
+                  </a>
+                )}
                 <button
                   className="icon-btn danger"
                   style={{ marginLeft: "auto" }}

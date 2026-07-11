@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { pb } from "../pb";
 import { useAuth } from "../auth";
-import { getPosition, captureSelfie } from "../capture";
+import { getPosition } from "../capture";
+import CameraCapture from "../CameraCapture";
 
 export default function CheckIn() {
   const { user, isAdmin, logout } = useAuth();
@@ -18,6 +19,8 @@ export default function CheckIn() {
   const [requireSelfie, setRequireSelfie] = useState(false);
   const [status, setStatus] = useState({ kind: "idle", msg: "" });
   const [busy, setBusy] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingPos, setPendingPos] = useState(null); // location awaiting a selfie
 
   // The next action is the opposite of the last punch (default: check in).
   const nextType = lastType === "check_in" ? "check_out" : "check_in";
@@ -39,25 +42,17 @@ export default function CheckIn() {
     })();
   }, [user.id]);
 
-  const punch = async () => {
-    setBusy(true);
-    setStatus({ kind: "working", msg: "Getting your location…" });
+  // Send the record. `selfie` (a Blob) is attached only when provided.
+  const submit = async (pos, selfie) => {
+    setStatus({ kind: "working", msg: "Submitting…" });
     try {
-      const pos = await getPosition();
-
       const data = new FormData();
       data.append("type", nextType);
       data.append("lat", pos.lat);
       data.append("lng", pos.lng);
       data.append("gps_accuracy", pos.accuracy);
+      if (selfie) data.append("selfie", selfie, "selfie.jpg");
 
-      if (requireSelfie) {
-        setStatus({ kind: "working", msg: "Taking your photo…" });
-        const selfie = await captureSelfie();
-        if (selfie) data.append("selfie", selfie, "selfie.jpg");
-      }
-
-      setStatus({ kind: "working", msg: "Submitting…" });
       await pb.collection("attendance_records").create(data);
 
       setLastType(nextType);
@@ -66,13 +61,47 @@ export default function CheckIn() {
         msg: `${nextType === "check_in" ? "Checked in" : "Checked out"} successfully.`,
       });
     } catch (err) {
-      // Surface the server's geofence message when present.
       const msg =
         err?.response?.message || err?.message || "Something went wrong.";
       setStatus({ kind: "error", msg });
     } finally {
       setBusy(false);
     }
+  };
+
+  const punch = async () => {
+    setBusy(true);
+    setStatus({ kind: "working", msg: "Getting your location…" });
+    try {
+      const pos = await getPosition();
+      if (requireSelfie) {
+        // Hand off to the camera modal; submission happens once the user
+        // confirms their photo (onCapture below).
+        setPendingPos(pos);
+        setShowCamera(true);
+        setStatus({ kind: "idle", msg: "" });
+      } else {
+        await submit(pos, null);
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.message || err?.message || "Something went wrong.";
+      setStatus({ kind: "error", msg });
+      setBusy(false);
+    }
+  };
+
+  const onSelfieConfirmed = async (blob) => {
+    setShowCamera(false);
+    await submit(pendingPos, blob);
+    setPendingPos(null);
+  };
+
+  const onSelfieCancel = () => {
+    setShowCamera(false);
+    setPendingPos(null);
+    setBusy(false);
+    setStatus({ kind: "idle", msg: "" });
   };
 
   return (
@@ -125,6 +154,13 @@ export default function CheckIn() {
           )}
         </div>
       </div>
+
+      {showCamera && (
+        <CameraCapture
+          onCapture={onSelfieConfirmed}
+          onCancel={onSelfieCancel}
+        />
+      )}
     </div>
   );
 }
