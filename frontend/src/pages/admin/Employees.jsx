@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { UserPlus, Pencil, Check, X } from "lucide-react";
 import { pb } from "../../pb";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -164,10 +165,11 @@ export default function Employees() {
           minLength={8}
           required
         />
-        <button type="submit">Add</button>
+        <button type="submit"><UserPlus /> Add</button>
       </form>
       {error && <p className="error">{error}</p>}
 
+      <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -248,9 +250,11 @@ export default function Employees() {
                 </td>
                 <td>{emp.active ? "Yes" : "No"}</td>
                 <td>
-                  <button className="link" onClick={saveEdit}>Save</button>
+                  <button className="link" onClick={saveEdit}>
+                    <Check /> Save
+                  </button>
                   <button className="link" onClick={() => setEditing(null)}>
-                    Cancel
+                    <X /> Cancel
                   </button>
                 </td>
               </tr>
@@ -277,7 +281,7 @@ export default function Employees() {
                 </td>
                 <td>
                   <button className="link" onClick={() => setEditing({ ...emp })}>
-                    Edit
+                    <Pencil /> Edit
                   </button>
                 </td>
               </tr>
@@ -285,6 +289,7 @@ export default function Employees() {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

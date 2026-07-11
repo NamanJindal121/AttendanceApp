@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  CalendarDays,
+  History as HistoryIcon,
+  Shield,
+  LogOut,
+  LogIn,
+  Clock,
+} from "lucide-react";
 import { pb } from "../pb";
 import { useAuth } from "../auth";
 import { getPosition, captureSelfie } from "../capture";
@@ -70,12 +78,24 @@ export default function CheckIn() {
   return (
     <div className="screen">
       <header className="topbar">
-        <span className="brand">{user.full_name || user.email}</span>
+        <span className="brand with-logo">
+          <span className="label-full">{user.full_name || user.email}</span>
+        </span>
         <div className="spacer" />
-        <Link to="/calendar" className="link">Calendar</Link>
-        <Link to="/history" className="link">History</Link>
-        {isAdmin && <Link to="/admin" className="link">Admin</Link>}
-        <button className="link" onClick={logout}>Sign out</button>
+        <Link to="/calendar" className="link">
+          <CalendarDays /> <span className="label">Calendar</span>
+        </Link>
+        <Link to="/history" className="link">
+          <HistoryIcon /> <span className="label">History</span>
+        </Link>
+        {isAdmin && (
+          <Link to="/admin" className="link">
+            <Shield /> <span className="label">Admin</span>
+          </Link>
+        )}
+        <button className="link" onClick={logout}>
+          <LogOut /> <span className="label">Sign out</span>
+        </button>
       </header>
 
       <div className="center grow">
@@ -90,6 +110,13 @@ export default function CheckIn() {
             onClick={punch}
             disabled={busy}
           >
+            {busy ? (
+              <Clock className="spin" />
+            ) : nextType === "check_in" ? (
+              <LogIn />
+            ) : (
+              <LogOut />
+            )}
             {busy ? "…" : nextLabel}
           </button>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Plus, Trash2, PencilLine } from "lucide-react";
 import { pb } from "../../pb";
 import Calendar from "../../Calendar";
 import { dayKey } from "../../attendance";
@@ -114,7 +115,7 @@ export default function AttendanceCalendar() {
       {/* Manual add / correct */}
       {selected && (
         <div className="manual-punch">
-          <h3>Add / correct a punch</h3>
+          <h3 className="section-title"><PencilLine /> Add / correct a punch</h3>
           <form className="filters" onSubmit={addPunch}>
             <label className="field">
               Date
@@ -139,7 +140,7 @@ export default function AttendanceCalendar() {
                 <option value="check_out">check out</option>
               </select>
             </label>
-            <button type="submit">Add punch</button>
+            <button type="submit"><Plus /> Add punch</button>
           </form>
           {msg && (
             <p className={msg.ok ? "status success" : "error"}>{msg.text}</p>
@@ -157,11 +158,12 @@ export default function AttendanceCalendar() {
                 </span>
                 <span className={`source ${r.source}`}>{r.source}</span>
                 <button
-                  className="link"
-                  style={{ marginLeft: "auto", color: "var(--red)" }}
+                  className="icon-btn danger"
+                  style={{ marginLeft: "auto" }}
+                  title="Delete punch"
                   onClick={() => removePunch(r.id)}
                 >
-                  Delete
+                  <Trash2 />
                 </button>
               </li>
             ))}

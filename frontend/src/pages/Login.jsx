@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Fingerprint, LogIn } from "lucide-react";
 import { useAuth } from "../auth";
 
 export default function Login() {
@@ -27,7 +28,7 @@ export default function Login() {
   return (
     <div className="screen center">
       <form className="card" onSubmit={submit}>
-        <div className="logo" />
+        <div className="logo"><Fingerprint /></div>
         <h1>Office Attendance</h1>
         <p className="subtitle">Sign in to check in and out</p>
         <label>
@@ -52,7 +53,7 @@ export default function Login() {
         </label>
         {error && <p className="error">{error}</p>}
         <button type="submit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+          <LogIn /> {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

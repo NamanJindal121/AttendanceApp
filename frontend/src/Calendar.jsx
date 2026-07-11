@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy } from "./attendance";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -55,9 +56,13 @@ export default function Calendar({ records, employee, settings, today = new Date
   return (
     <div className="calendar">
       <div className="cal-head">
-        <button className="link" onClick={() => move(-1)}>‹ Prev</button>
+        <button className="icon-btn" onClick={() => move(-1)} title="Previous month">
+          <ChevronLeft />
+        </button>
         <strong>{MONTHS[cursor.month]} {cursor.year}</strong>
-        <button className="link" onClick={() => move(1)}>Next ›</button>
+        <button className="icon-btn" onClick={() => move(1)} title="Next month">
+          <ChevronRight />
+        </button>
       </div>
 
       <div className="cal-summary">

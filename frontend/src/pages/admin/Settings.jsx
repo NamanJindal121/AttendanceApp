@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MapPin, Save } from "lucide-react";
 import { pb } from "../../pb";
 
 // Geofence configuration editor. Edits the single `settings` record that the
@@ -70,7 +71,7 @@ export default function Settings() {
         />
       </label>
       <button className="link" onClick={useMyLocation}>
-        Use my current location
+        <MapPin /> Use my current location
       </button>
       <label>
         Radius (metres)
@@ -131,7 +132,7 @@ export default function Settings() {
         />
       </label>
 
-      <button onClick={save}>Save</button>
+      <button onClick={save}><Save /> Save</button>
       {saved && <p className="status success">Saved.</p>}
       {error && <p className="error">{error}</p>}
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { pb } from "../pb";
 import { useAuth } from "../auth";
 import Calendar from "../Calendar";
@@ -24,9 +25,11 @@ export default function MyCalendar() {
   return (
     <div className="screen">
       <header className="topbar">
-        <Link to="/" className="link">← Back</Link>
+        <Link to="/" className="link">
+          <ArrowLeft /> <span className="label">Back</span>
+        </Link>
         <div className="spacer" />
-        <span>My Calendar</span>
+        <span className="brand">My Calendar</span>
       </header>
       <div className="pad">
         {settings ? (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Search, Download } from "lucide-react";
 import { pb } from "../../pb";
 
 // Default the date range to the last 7 days (yyyy-mm-dd for <input type=date>).
@@ -63,13 +64,14 @@ export default function Report() {
           To <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <button onClick={load} disabled={loading}>
-          {loading ? "…" : "Apply"}
+          <Search /> {loading ? "…" : "Apply"}
         </button>
         <button onClick={exportCsv} disabled={rows.length === 0}>
-          Export CSV
+          <Download /> Export CSV
         </button>
       </div>
 
+      <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -98,6 +100,7 @@ export default function Report() {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

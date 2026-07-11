@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { pb } from "../pb";
 import { useAuth } from "../auth";
 
@@ -20,9 +21,11 @@ export default function History() {
   return (
     <div className="screen">
       <header className="topbar">
-        <Link to="/" className="link">← Back</Link>
+        <Link to="/" className="link">
+          <ArrowLeft /> <span className="label">Back</span>
+        </Link>
         <div className="spacer" />
-        <span>My History</span>
+        <span className="brand">My History</span>
       </header>
 
       <ul className="list">
