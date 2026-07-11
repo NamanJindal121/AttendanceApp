@@ -42,14 +42,18 @@ onRecordCreateRequest((e) => {
   }
 
   // Admins / superusers creating records manually (corrections, seeding, or the
-  // biometric bridge) skip the geofence entirely. The check honours whatever
-  // employee/type/timestamp/source they supply. Regular employees fall through
-  // to the enforced app-check-in path below.
+  // biometric bridge) skip the geofence. This is only a MANUAL entry when they
+  // explicitly supply the target `employee`. An admin tapping the normal
+  // check-in button sends no employee, so they fall through to the standard
+  // self-check-in path below and ARE geofenced like everyone else.
   const isPrivileged =
     e.auth.collection().name === "_superusers" ||
     e.auth.get("role") === "admin";
-  if (isPrivileged) {
+  const isManualEntry = isPrivileged && !!record.get("employee");
+  if (isManualEntry) {
     if (!record.get("source")) record.set("source", "app");
+    if (!record.get("timestamp")) record.set("timestamp", new DateTime());
+    if (record.get("flagged") === undefined) record.set("flagged", false);
     e.next();
     return;
   }
