@@ -4,7 +4,8 @@
 // Attendance app server-side logic.
 //
 //  1. Geofence + dedup validation for app check-ins (onRecordCreateRequest).
-//  2. ADMS "iclock" receiver route for biometric device push (see adms.pb.js).
+//  2. Biometric punches arrive via the LAN poller (see bridge/poller.py) which
+//     posts to the /api/bridge/punch route in bridge.pb.js.
 //
 // Security principle: never trust the client's "I'm at the office" claim — the
 // distance and identity are (re)computed / forced on the server.
