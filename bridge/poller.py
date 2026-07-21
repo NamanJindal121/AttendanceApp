@@ -91,7 +91,11 @@ def pb_authenticate():
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read())["token"]
-    except (urllib.error.URLError, KeyError, TimeoutError):
+    except urllib.error.HTTPError as ex:
+        print(f"[poller] Auth HTTPError {ex.code}: {ex.read().decode()}", flush=True)
+        return None
+    except (urllib.error.URLError, KeyError, TimeoutError) as ex:
+        print(f"[poller] Auth Error: {ex}", flush=True)
         return None
 
 
