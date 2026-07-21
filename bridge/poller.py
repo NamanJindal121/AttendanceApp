@@ -81,7 +81,7 @@ def save_state(seen, buffer):
 
 def pb_authenticate():
     """Return an auth token for the service account, or None if server is down."""
-    url = f"{PB_URL}/api/collections/employees/auth-with-password"
+    url = f"{PB_URL}/api/collections/_superusers/auth-with-password"
     body = json.dumps(
         {"identity": PB_SERVICE_EMAIL, "password": PB_SERVICE_PASSWORD}
     ).encode()
