@@ -60,11 +60,11 @@ tunnel. Nothing connects *in* to the PC, so no public address/ports are needed.
 On the office PC:
 
 1. Download the **Windows** PocketBase build (v0.28.4) from
-   https://github.com/pocketbase/pocketbase/releases → unzip to `C:\attendance\`
-   so you have `C:\attendance\pocketbase.exe`.
+   https://github.com/pocketbase/pocketbase/releases → unzip to `E:\attendance\`
+   so you have `E:\attendance\pocketbase.exe`.
 2. Get the app code (hooks + migrations). Easiest: install Git for Windows, then:
    ```powershell
-   cd C:\attendance
+   cd E:\attendance
    git clone https://github.com/NamanJindal121/AttendanceApp.git repo
    ```
    Copy `repo\backend\pb_hooks` and `repo\backend\pb_migrations` next to the exe:
@@ -81,17 +81,17 @@ On the office PC:
    (PocketBase automatically serves static files placed in `pb_public\`.)
 4. Apply migrations and create your admin:
    ```powershell
-   cd C:\attendance
+   cd E:\attendance
    .\pocketbase.exe migrate up
    .\pocketbase.exe superuser create you@gmail.com "strong-password"
    ```
 5. Install as an always-on service so it survives reboots/logout. Use
-   [NSSM](https://nssm.cc/download) (unzip, put `nssm.exe` in `C:\attendance`):
+   [NSSM](https://nssm.cc/download) (unzip, put `nssm.exe` in `E:\attendance`):
    ```powershell
-   C:\attendance\nssm.exe install AttendancePB C:\attendance\pocketbase.exe "serve --http=127.0.0.1:8090"
-   C:\attendance\nssm.exe set AttendancePB AppDirectory C:\attendance
-   C:\attendance\nssm.exe set AttendancePB Start SERVICE_AUTO_START
-   C:\attendance\nssm.exe start AttendancePB
+   E:\attendance\nssm.exe install AttendancePB E:\attendance\pocketbase.exe "serve --http=127.0.0.1:8090"
+   E:\attendance\nssm.exe set AttendancePB AppDirectory E:\attendance
+   E:\attendance\nssm.exe set AttendancePB Start SERVICE_AUTO_START
+   E:\attendance\nssm.exe start AttendancePB
    ```
    Verify: open http://127.0.0.1:8090/_/ in the PC's browser.
 
@@ -101,23 +101,23 @@ On the office PC:
 
 1. Download `cloudflared` for Windows (cloudflared-windows-amd64.exe) from
    https://github.com/cloudflare/cloudflared/releases → save as
-   `C:\attendance\cloudflared.exe`.
+   `E:\attendance\cloudflared.exe`.
 2. Authenticate it to your Cloudflare account:
    ```powershell
-   C:\attendance\cloudflared.exe tunnel login
+   E:\attendance\cloudflared.exe tunnel login
    ```
    (opens a browser; pick `jindal.biz.in`.)
 3. Create the tunnel and route the hostname to local PocketBase:
    ```powershell
-   C:\attendance\cloudflared.exe tunnel create attendance
-   C:\attendance\cloudflared.exe tunnel route dns attendance attendance.jindal.biz.in
+   E:\attendance\cloudflared.exe tunnel create attendance
+   E:\attendance\cloudflared.exe tunnel route dns attendance attendance.jindal.biz.in
    ```
    The `route dns` command auto-creates the CNAME in Cloudflare pointing
    `attendance.jindal.biz.in` into the tunnel.
-4. Create a config file `C:\Users\<you>\.cloudflared\config.yml`:
+4. Create a config file `E:\Users\<you>\.cloudflared\config.yml`:
    ```yaml
    tunnel: attendance
-   credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL-ID>.json
+   credentials-file: E:\Users\<you>\.cloudflared\<TUNNEL-ID>.json
    ingress:
      - hostname: attendance.jindal.biz.in
        service: http://127.0.0.1:8090
@@ -126,7 +126,7 @@ On the office PC:
    (The tunnel ID + json path are printed by `tunnel create`.)
 5. Install it as a service so the tunnel is always up:
    ```powershell
-   C:\attendance\cloudflared.exe service install
+   E:\attendance\cloudflared.exe service install
    ```
 6. Test: from any phone/browser, open **https://attendance.jindal.biz.in** — the
    login page should load with a valid padlock (Cloudflare provides the cert).
@@ -153,7 +153,7 @@ LAN and writes to `localhost` — the simplest possible path.
    the PC can reach it on port 4370.
 2. Install Python for Windows, then:
    ```powershell
-   cd C:\attendance\repo\bridge
+   cd E:\attendance\repo\bridge
    pip install -r requirements.txt
    ```
 3. Set env vars (device IP, `PB_URL=http://127.0.0.1:8090`, the bridge service
@@ -168,17 +168,17 @@ continuously and the poller buffers locally regardless.
 
 ## Part 6 — Backups (your responsibility now)
 
-Data lives in `C:\attendance\pb_data`. Automate a daily copy off the PC:
+Data lives in `E:\attendance\pb_data`. Automate a daily copy off the PC:
 
 1. Simple local + cloud copy via a scheduled task. Example PowerShell
-   (`C:\attendance\backup.ps1`):
+   (`E:\attendance\backup.ps1`):
    ```powershell
    $stamp = Get-Date -Format "yyyy-MM-dd"
-   Compress-Archive -Path C:\attendance\pb_data\* -DestinationPath "C:\attendance\backups\pb_$stamp.zip" -Force
-   # then copy C:\attendance\backups to a synced folder (OneDrive/Google Drive/USB)
+   Compress-Archive -Path E:\attendance\pb_data\* -DestinationPath "E:\attendance\backups\pb_$stamp.zip" -Force
+   # then copy E:\attendance\backups to a synced folder (OneDrive/Google Drive/USB)
    ```
 2. **Task Scheduler** → Create task → daily at, say, 21:00 → action:
-   `powershell -File C:\attendance\backup.ps1`. Point the backups folder at a
+   `powershell -File E:\attendance\backup.ps1`. Point the backups folder at a
    cloud-synced directory so a disk failure isn't catastrophic.
 
 ---
@@ -186,13 +186,13 @@ Data lives in `C:\attendance\pb_data`. Automate a daily copy off the PC:
 ## Updating later
 
 ```powershell
-cd C:\attendance\repo
+cd E:\attendance\repo
 git pull
 cd frontend ; npm install ; npm run build
-xcopy /E /I /Y dist C:\attendance\pb_public
-xcopy /E /I /Y ..\backend\pb_hooks C:\attendance\pb_hooks
-xcopy /E /I /Y ..\backend\pb_migrations C:\attendance\pb_migrations
-cd C:\attendance
+xcopy /E /I /Y dist E:\attendance\pb_public
+xcopy /E /I /Y ..\backend\pb_hooks E:\attendance\pb_hooks
+xcopy /E /I /Y ..\backend\pb_migrations E:\attendance\pb_migrations
+cd E:\attendance
 .\pocketbase.exe migrate up
 nssm restart AttendancePB
 ```
