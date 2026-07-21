@@ -115,6 +115,7 @@ def pb_create_punch(token, punch):
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"[poller] added punch record: {punch}", flush=True)
             return resp.status == 200
     except urllib.error.HTTPError as ex:
         # 404 = unmapped biometric id: drop it (won't succeed on retry until an
@@ -139,7 +140,7 @@ def read_device_punches():
             ts = att.timestamp.strftime("%Y-%m-%d %H:%M:%S")
             uid = str(att.user_id)
             # status: 0 = check-in, 1 = check-out (mirrors the ADMS mapping)
-            ptype = "check_out" if att.status in (1, 5) else "check_in"
+            ptype = "check_out" if att.punch in (1, 5) else "check_in"
             punches.append(
                 {
                     "biometric_user_id": uid,
