@@ -69,14 +69,14 @@ On the office PC:
    ```
    Copy `repo\backend\pb_hooks` and `repo\backend\pb_migrations` next to the exe:
    ```powershell
-   xcopy /E /I repo\backend\pb_hooks C:\attendance\pb_hooks
-   xcopy /E /I repo\backend\pb_migrations C:\attendance\pb_migrations
+   xcopy /E /I repo\backend\pb_hooks E:\attendance\pb_hooks
+   xcopy /E /I repo\backend\pb_migrations E:\attendance\pb_migrations
    ```
 3. Build the frontend and have PocketBase serve it (so it's one process):
    ```powershell
-   cd C:\attendance\repo\frontend
+   cd E:\attendance\repo\frontend
    npm install ; npm run build
-   xcopy /E /I dist C:\attendance\pb_public
+   xcopy /E /I dist E:\attendance\pb_public
    ```
    (PocketBase automatically serves static files placed in `pb_public\`.)
 4. Apply migrations and create your admin:
