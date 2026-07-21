@@ -114,10 +114,10 @@ On the office PC:
    ```
    The `route dns` command auto-creates the CNAME in Cloudflare pointing
    `attendance.jindal.biz.in` into the tunnel.
-4. Create a config file `E:\Users\<you>\.cloudflared\config.yml`:
+4. Create a config file `C:\Users\<you>\.cloudflared\config.yml`:
    ```yaml
    tunnel: attendance
-   credentials-file: E:\Users\<you>\.cloudflared\<TUNNEL-ID>.json
+   credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL-ID>.json
    ingress:
      - hostname: attendance.jindal.biz.in
        service: http://127.0.0.1:8090
