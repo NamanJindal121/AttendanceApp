@@ -19,8 +19,8 @@ routerAdd(
   "POST",
   "/api/bridge/punch",
   (e) => {
-    // Require an authenticated superuser (the service account).
-    if (!e.auth || !e.auth.isSuperuser()) {
+    // Require an authenticated admin (the service account).
+    if (!e.auth || e.auth.get("role") !== "admin") {
       return e.json(403, { message: "forbidden" });
     }
 
@@ -73,5 +73,5 @@ routerAdd(
       return e.json(500, { message: "save failed" });
     }
   },
-  $apis.requireAuth()
+  $apis.requireAuth("employees")
 );
