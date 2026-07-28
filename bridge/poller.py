@@ -139,12 +139,9 @@ def read_device_punches():
         for att in conn.get_attendance():
             ts = att.timestamp.strftime("%Y-%m-%d %H:%M:%S")
             uid = str(att.user_id)
-            # status: 0 = check-in, 1 = check-out (mirrors the ADMS mapping)
-            ptype = "check_out" if att.punch in (1, 5) else "check_in"
             punches.append(
                 {
                     "biometric_user_id": uid,
-                    "type": ptype,
                     "timestamp": ts,
                     "device_punch_id": f"{DEVICE_SERIAL}:{uid}:{ts}",
                 }

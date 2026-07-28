@@ -27,7 +27,6 @@ routerAdd(
     const data = e.requestInfo().body;
     const uid = data.biometric_user_id;
     const rawTs = data.timestamp;
-    const type = data.type === "check_out" ? "check_out" : "check_in";
     const punchId = data.device_punch_id;
 
     if (!uid || !rawTs || !punchId) {
@@ -58,6 +57,29 @@ routerAdd(
       return e.json(404, { message: "unmapped biometric_user_id" });
     }
 
+    // Determine type server-side: first punch of the day = check_in, then alternate.
+    // Use the punch's own date (not "today") so historical imports also work correctly.
+    const punchDate = rawTs.substring(0, 10); // "YYYY-MM-DD"
+    const dayStart = punchDate + " 00:00:00";
+    const dayEnd = punchDate + " 23:59:59";
+    let type = "check_in"; // default: first of the day
+    try {
+      const todayRecords = e.app.findRecordsByFilter(
+        "attendance_records",
+        "employee = {:emp} && timestamp >= {:start} && timestamp <= {:end}",
+        "-timestamp",
+        1, // only need the latest
+        0,
+        { emp: employee.id, start: dayStart, end: dayEnd }
+      );
+      if (todayRecords.length > 0) {
+        // Alternate: if last was check_in -> check_out, and vice versa
+        type = todayRecords[0].get("type") === "check_in" ? "check_out" : "check_in";
+      }
+    } catch (err) {
+      // no records today -> stays check_in
+    }
+
     try {
       const col = e.app.findCollectionByNameOrId("attendance_records");
       const rec = new Record(col);
@@ -68,7 +90,7 @@ routerAdd(
       rec.set("device_punch_id", punchId);
       rec.set("flagged", false);
       e.app.save(rec);
-      return e.json(200, { status: "created", id: rec.id });
+      return e.json(200, { status: "created", type: type, id: rec.id });
     } catch (err) {
       return e.json(500, { message: "save failed" });
     }

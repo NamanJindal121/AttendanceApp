@@ -66,10 +66,28 @@ onRecordCreateRequest((e) => {
   record.set("source", "app");
   record.set("flagged", false);
 
-  const type = record.get("type");
-  if (type !== "check_in" && type !== "check_out") {
-    throw new BadRequestError("type must be check_in or check_out.");
+  // Determine type server-side: first punch of the day = check_in, then alternate.
+  const now = record.get("timestamp");
+  const todayStr = now.string().substring(0, 10); // "YYYY-MM-DD"
+  const dayStart = todayStr + " 00:00:00";
+  const dayEnd = todayStr + " 23:59:59";
+  let type = "check_in"; // default: first of the day
+  try {
+    const todayRecords = e.app.findRecordsByFilter(
+      "attendance_records",
+      "employee = {:emp} && timestamp >= {:start} && timestamp <= {:end}",
+      "-timestamp",
+      1,
+      0,
+      { emp: e.auth.id, start: dayStart, end: dayEnd }
+    );
+    if (todayRecords.length > 0) {
+      type = todayRecords[0].get("type") === "check_in" ? "check_out" : "check_in";
+    }
+  } catch (err) {
+    // no records today -> stays check_in
   }
+  record.set("type", type);
 
   // Load geofence configuration (single settings record).
   let settings;

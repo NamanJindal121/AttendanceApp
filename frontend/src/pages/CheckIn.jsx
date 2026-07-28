@@ -33,8 +33,10 @@ export default function CheckIn() {
         if (settings[0]) setRequireSelfie(!!settings[0].require_selfie);
       } catch (_) {}
       try {
+        // Only look at today's records so the state resets every morning.
+        const today = new Date().toISOString().slice(0, 10);
         const last = await pb.collection("attendance_records").getList(1, 1, {
-          filter: `employee = "${user.id}"`,
+          filter: `employee = "${user.id}" && timestamp >= "${today} 00:00:00" && timestamp <= "${today} 23:59:59"`,
           sort: "-timestamp",
         });
         if (last.items[0]) setLastType(last.items[0].type);
@@ -57,18 +59,17 @@ export default function CheckIn() {
     setStatus({ kind: "working", msg: "Submitting…" });
     try {
       const data = new FormData();
-      data.append("type", nextType);
       data.append("lat", pos.lat);
       data.append("lng", pos.lng);
       data.append("gps_accuracy", pos.accuracy);
       if (selfie) data.append("selfie", selfie, "selfie.jpg");
 
-      await pb.collection("attendance_records").create(data);
+      const created = await pb.collection("attendance_records").create(data);
 
-      setLastType(nextType);
+      setLastType(created.type);
       setStatus({
         kind: "success",
-        msg: `${nextType === "check_in" ? "Checked in" : "Checked out"} successfully.`,
+        msg: `${created.type === "check_in" ? "Checked in" : "Checked out"} successfully.`,
       });
     } catch (err) {
       setStatus({ kind: "error", msg: errorMessage(err) });
