@@ -45,6 +45,11 @@ except ImportError:
     raise
 
 
+def log(msg):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {msg}", flush=True)
+
+
 def env(key, default=None, required=False):
     val = os.environ.get(key, default)
     if required and not val:
@@ -92,10 +97,10 @@ def pb_authenticate():
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read())["token"]
     except urllib.error.HTTPError as ex:
-        print(f"[poller] Auth HTTPError {ex.code}: {ex.read().decode()}", flush=True)
+        log(f"Auth HTTPError {ex.code} from PocketBase: {ex.read().decode()}")
         return None
     except (urllib.error.URLError, KeyError, TimeoutError) as ex:
-        print(f"[poller] Auth Error: {ex}", flush=True)
+        log(f"Auth Error connecting to PocketBase: {ex}")
         return None
 
 
@@ -121,7 +126,7 @@ def pb_create_punch(token, punch):
         # 404 = unmapped biometric id: drop it (won't succeed on retry until an
         # admin maps the id, and re-reading the device will re-buffer it anyway).
         if ex.code == 404:
-            print(f"[poller] unmapped biometric id, dropping: {punch}", flush=True)
+            log(f"DROPPED: Unmapped biometric user ID {punch['biometric_user_id']}. Please map this employee in PocketBase.")
             return True
         return False
     except (urllib.error.URLError, TimeoutError):
@@ -155,32 +160,45 @@ def read_device_punches():
 
 def main():
     seen, buffer = load_state()
-    print(f"[poller] starting; {len(seen)} seen, {len(buffer)} buffered", flush=True)
+    log(f"Poller Service Started. Tracking {len(seen)} historical punches. {len(buffer)} punches waiting in buffer to be sent.")
 
     while True:
         # 1) Pull new punches from the device (device is on the LAN, always up).
         try:
-            for p in read_device_punches():
+            punches = read_device_punches()
+            new_punches = 0
+            for p in punches:
                 if p["device_punch_id"] not in seen:
                     buffer.append(p)
                     seen.add(p["device_punch_id"])
+                    new_punches += 1
             save_state(seen, buffer)
+            
+            if new_punches > 0:
+                log(f"Found {new_punches} NEW punch(es) from the biometric device. (Total waiting in buffer: {len(buffer)})")
         except Exception as ex:  # device offline / network blip — try next cycle
-            print(f"[poller] device read failed: {ex}", flush=True)
+            log(f"WARNING: Could not connect to biometric device at {DEVICE_IP}:{DEVICE_PORT}. Error: {ex}")
 
         # 2) Drain the buffer to PocketBase (may be down overnight -> keep buffered).
         if buffer:
             token = pb_authenticate()
             if token:
                 still = []
+                sent_count = 0
                 for p in buffer:
-                    if not pb_create_punch(token, p):
+                    if pb_create_punch(token, p):
+                        sent_count += 1
+                    else:
                         still.append(p)  # keep for retry
                 buffer = still
                 save_state(seen, buffer)
-                print(f"[poller] drained; {len(buffer)} still buffered", flush=True)
+                
+                if sent_count > 0:
+                    log(f"SUCCESS: Pushed {sent_count} punch(es) to PocketBase.")
+                if len(buffer) > 0:
+                    log(f"WARNING: {len(buffer)} punch(es) failed to push and will remain in the buffer to retry.")
             else:
-                print("[poller] server unreachable, buffering", flush=True)
+                log(f"ERROR: Could not authenticate with PocketBase at {PB_URL}. The system will keep {len(buffer)} punch(es) safe in the buffer and try again later.")
 
         time.sleep(POLL_INTERVAL)
 
