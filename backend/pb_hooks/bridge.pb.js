@@ -57,27 +57,50 @@ routerAdd(
       return e.json(404, { message: "unmapped biometric_user_id" });
     }
 
+    const MIN_PUNCH_INTERVAL_SECONDS = 5 * 60;
+
     // Determine type server-side: first punch of the day = check_in, then alternate.
     // Use the punch's own date (not "today") so historical imports also work correctly.
     const punchDate = rawTs.substring(0, 10); // "YYYY-MM-DD"
-    const dayStart = punchDate + " 00:00:00";
-    const dayEnd = punchDate + " 23:59:59";
     let type = "check_in"; // default: first of the day
+    let isTooSoon = false;
+
     try {
-      const todayRecords = e.app.findRecordsByFilter(
+      // Find the absolute most recent punch before this one to check the interval
+      const previousRecords = e.app.findRecordsByFilter(
         "attendance_records",
-        "employee = {:emp} && timestamp >= {:start} && timestamp <= {:end}",
+        "employee = {:emp} && timestamp <= {:ts}",
         "-timestamp",
         1, // only need the latest
         0,
-        { emp: employee.id, start: dayStart, end: dayEnd }
+        { emp: employee.id, ts: rawTs }
       );
-      if (todayRecords.length > 0) {
-        // Alternate: if last was check_in -> check_out, and vice versa
-        type = todayRecords[0].get("type") === "check_in" ? "check_out" : "check_in";
+
+      if (previousRecords.length > 0) {
+        const prev = previousRecords[0];
+
+        // 1. Check interval (against the absolute previous punch)
+        const currentDt = new DateTime(rawTs);
+        const secondsSincePrev = Math.abs(currentDt.sub(prev.get("timestamp")).seconds());
+        if (secondsSincePrev < MIN_PUNCH_INTERVAL_SECONDS) {
+           isTooSoon = true;
+        }
+
+        // 2. Check type (only if the previous punch was on the SAME day)
+        // PocketBase DateTime string format is "YYYY-MM-DD HH:mm:ss.SSSZ"
+        const prevDate = prev.get("timestamp").string().substring(0, 10);
+        if (prevDate === punchDate) {
+          type = prev.get("type") === "check_in" ? "check_out" : "check_in";
+        }
       }
     } catch (err) {
-      // no records today -> stays check_in
+      // no records -> stays check_in, not too soon
+    }
+
+    if (isTooSoon) {
+      // Return 200 so the poller marks it as processed and drops it from the buffer.
+      // If we returned 4xx/5xx, the poller would retry it infinitely.
+      return e.json(200, { status: "ignored_too_soon" });
     }
 
     try {
