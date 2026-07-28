@@ -106,7 +106,7 @@ body {
   transition: background 0.15s;
 }
 .link:hover {
-  background: #eff6ff;
+  background: #eff6ff !important;
 }
 
 /* --------------------------------------------------------------- login */
@@ -498,9 +498,15 @@ tr.editing td {
   font-size: 0.8rem;
   font-weight: 600;
 }
+.day-toggle:hover {
+  background: #d1d5db !important;
+}
 .day-toggle.on {
   background: var(--blue);
   color: #fff;
+}
+.day-toggle.on:hover {
+  background: var(--blue-dark) !important;
 }
 .day-toggle.sm {
   padding: 0.3rem 0.45rem;
