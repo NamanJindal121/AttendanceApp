@@ -147,7 +147,7 @@ def read_device_punches():
             punches.append(
                 {
                     "biometric_user_id": uid,
-                    "timestamp": ts,
+                    "timestamp": f"{ts}+05:30", # Tell PB this is already in IST!
                     "device_punch_id": f"{DEVICE_SERIAL}:{uid}:{ts}",
                 }
             )

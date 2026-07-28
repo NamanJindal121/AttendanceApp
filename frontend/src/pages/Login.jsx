@@ -19,7 +19,7 @@ export default function Login() {
       await login(email, password);
       navigate("/");
     } catch (err) {
-      setError("Invalid email or password.");
+      setError("Invalid email/username or password.");
     } finally {
       setBusy(false);
     }
@@ -32,9 +32,9 @@ export default function Login() {
         <h1>Office Attendance</h1>
         <p className="subtitle">Sign in to check in and out</p>
         <label>
-          Email
+          Email or Username
           <input
-            type="email"
+            type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"

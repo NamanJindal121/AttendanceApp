@@ -83,7 +83,7 @@ routerAdd(
         const currentDt = new DateTime(rawTs);
         const secondsSincePrev = Math.abs(currentDt.sub(prev.get("timestamp")).seconds());
         if (secondsSincePrev < MIN_PUNCH_INTERVAL_SECONDS) {
-           isTooSoon = true;
+          isTooSoon = true;
         }
 
         // 2. Check type (only if the previous punch was on the SAME day)
