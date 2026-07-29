@@ -52,19 +52,45 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
   const isWorkDay = workDays.includes(weekday);
 
   const records = dayRecords || [];
-  const checkIns = records
-    .filter((r) => r.type === "check_in")
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  const checkOuts = records.filter((r) => r.type === "check_out");
+  // Sort ALL records by timestamp ascending to calculate exact time worked
+  const sortedRecords = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+  const checkIns = sortedRecords.filter((r) => r.type === "check_in");
+  const checkOuts = sortedRecords.filter((r) => r.type === "check_out");
 
   // Future day: don't judge it yet.
   const todayKey = dayKey(today);
   if (dateStr > todayKey) {
-    return { status: "future", late: false, lateBy: 0, noCheckout: false };
+    return { status: "future", late: false, lateBy: 0, noCheckout: false, workedMinutes: 0, shortfall: false };
   }
 
   if (checkIns.length > 0) {
-    // Present. Late if the FIRST check-in is > grace minutes after schedule.
+    // Calculate total time worked
+    let workedMinutes = 0;
+    let currentIn = null;
+    
+    for (const r of sortedRecords) {
+      if (r.type === "check_in") {
+        if (!currentIn) currentIn = new Date(r.timestamp);
+      } else if (r.type === "check_out") {
+        if (currentIn) {
+          const out = new Date(r.timestamp);
+          workedMinutes += Math.floor((out - currentIn) / 60000);
+          currentIn = null;
+        }
+      }
+    }
+
+    const noCheckout = checkOuts.length === 0 || currentIn !== null;
+
+    // Check if freelancer mode (daily_hours > 0)
+    const dailyHours = Number(employee?.daily_hours || 0);
+    if (dailyHours > 0) {
+      const shortfall = workedMinutes < (dailyHours * 60);
+      return { status: "present", late: false, lateBy: 0, noCheckout, workedMinutes, shortfall, isFreelancer: true };
+    }
+
+    // Fixed Schedule Mode
     let lateBy = 0;
     const sched = parseHHMM(employee?.scheduled_check_in);
     const grace = Number(settings?.late_grace_minutes ?? 10);
@@ -75,8 +101,8 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
       const over = firstMin - sched;
       if (over > grace) lateBy = over;
     }
-    const noCheckout = checkOuts.length === 0;
-    return { status: "present", late: lateBy > 0, lateBy, noCheckout };
+    
+    return { status: "present", late: lateBy > 0, lateBy, noCheckout, workedMinutes, shortfall: false, isFreelancer: false };
   }
 
   // No check-in: absent on a work day, neutral otherwise.
@@ -85,6 +111,9 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
     late: false,
     lateBy: 0,
     noCheckout: false,
+    workedMinutes: 0,
+    shortfall: false,
+    isFreelancer: Number(employee?.daily_hours || 0) > 0,
   };
 }
 
@@ -95,6 +124,15 @@ export function formatLateBy(minutes) {
   const m = minutes % 60;
   if (h > 0) return `Late by ${h}h${m > 0 ? " " + m + "m" : ""}`;
   return `Late by ${m}m`;
+}
+
+// Format worked minutes as "3h 15m"
+export function formatWorkedTime(minutes) {
+  if (!minutes || minutes <= 0) return "0m";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0) return `${h}h${m > 0 ? " " + m + "m" : ""}`;
+  return `${m}m`;
 }
 
 // Build the weeks grid (array of weeks, each 7 cells; leading/trailing null pads)

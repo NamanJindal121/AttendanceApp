@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy } from "./attendance";
+import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy, formatWorkedTime } from "./attendance";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -10,7 +10,7 @@ const MONTHS = [
 
 // A month attendance calendar for one employee.
 //   records:  that employee's attendance_records
-//   employee: { scheduled_check_in, scheduled_check_out }
+//   employee: { scheduled_check_in, scheduled_check_out, daily_hours }
 //   settings: { work_days, late_grace_minutes }
 //   today:    a Date (defaults to now)
 export default function Calendar({ records, employee, settings, today = new Date() }) {
@@ -32,9 +32,11 @@ export default function Calendar({ records, employee, settings, today = new Date
     });
   };
 
-  // Month summary counts (present / absent / late).
+  const isFreelancer = Number(employee?.daily_hours || 0) > 0;
+
+  // Month summary counts (present / absent / late / shortfall).
   const summary = useMemo(() => {
-    let present = 0, absent = 0, late = 0;
+    let present = 0, absent = 0, late = 0, shortfall = 0;
     for (const week of weeks) {
       for (const cell of week) {
         if (!cell) continue;
@@ -43,12 +45,13 @@ export default function Calendar({ records, employee, settings, today = new Date
         if (s.status === "present") {
           present++;
           if (s.late) late++;
+          if (s.shortfall) shortfall++;
         } else if (s.status === "absent") {
           absent++;
         }
       }
     }
-    return { present, absent, late };
+    return { present, absent, late, shortfall };
   }, [weeks, byDay, employee, settings, today]);
 
   const todayKey = dayKey(today);
@@ -67,7 +70,10 @@ export default function Calendar({ records, employee, settings, today = new Date
 
       <div className="cal-summary">
         <span className="chip present">{summary.present} present</span>
-        <span className="chip late">{summary.late} late</span>
+        {isFreelancer
+          ? <span className="chip shortfall">{summary.shortfall} shortfall</span>
+          : <span className="chip late">{summary.late} late</span>
+        }
         <span className="chip absent">{summary.absent} absent</span>
       </div>
 
@@ -82,13 +88,17 @@ export default function Calendar({ records, employee, settings, today = new Date
             const s = dayStatus(key, byDay[key], employee, settings, today);
             const classes = ["cal-cell", s.status];
             if (s.late) classes.push("is-late");
+            if (s.shortfall) classes.push("is-shortfall");
             if (key === todayKey) classes.push("is-today");
             return (
               <div key={key} className={classes.join(" ")} title={label(s)}>
                 <span className="cal-daynum">{cell.getDate()}</span>
                 {s.status === "present" && (
                   <span className="cal-tag">
-                    {s.late ? formatLateBy(s.lateBy) : "Present"}
+                    {s.isFreelancer
+                      ? formatWorkedTime(s.workedMinutes)
+                      : (s.late ? formatLateBy(s.lateBy) : "Present")
+                    }
                     {s.noCheckout && <span className="cal-nocheckout" title="No check-out">*</span>}
                   </span>
                 )}
@@ -101,7 +111,10 @@ export default function Calendar({ records, employee, settings, today = new Date
 
       <div className="cal-legend">
         <span><i className="dot present" /> Present</span>
-        <span><i className="dot is-late" /> Late (&gt; grace)</span>
+        {isFreelancer
+          ? <span><i className="dot is-shortfall" /> Shortfall</span>
+          : <span><i className="dot is-late" /> Late (&gt; grace)</span>
+        }
         <span><i className="dot absent" /> Absent</span>
         <span><i className="dot off" /> Non-working</span>
         <span>* = no check-out recorded</span>
@@ -112,6 +125,9 @@ export default function Calendar({ records, employee, settings, today = new Date
 
 function label(s) {
   if (s.status === "present") {
+    if (s.isFreelancer) {
+      return "Worked " + formatWorkedTime(s.workedMinutes) + (s.shortfall ? " (shortfall)" : "") + (s.noCheckout ? " — no check-out" : "");
+    }
     return (
       (s.late ? formatLateBy(s.lateBy) : "Present") +
       (s.noCheckout ? " — no check-out" : "")

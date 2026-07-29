@@ -9,11 +9,14 @@ const BLANK = {
   username: "",
   full_name: "",
   biometric_user_id: "",
+  aadhar_card: null,
   role: "employee",
   active: true,
   password: "",
-  scheduled_check_in: "09:00",
-  scheduled_check_out: "18:00",
+  schedule_type: "fixed", // "fixed" or "freelancer"
+  scheduled_check_in: "09:30",
+  scheduled_check_out: "19:30",
+  daily_hours: "",
   work_days: [], // empty = inherit office default
 };
 
@@ -56,7 +59,7 @@ export default function Employees() {
       .collection("employees")
       .getFullList({ sort: "full_name" })
       .then(setList)
-      .catch(() => {});
+      .catch(() => { });
 
   useEffect(() => {
     load();
@@ -66,12 +69,19 @@ export default function Employees() {
     e.preventDefault();
     setError("");
     try {
-      await pb.collection("employees").create({
+      const payload = {
         ...form,
         email: `${form.username}${EMAIL_DOMAIN}`,
         passwordConfirm: form.password,
         emailVisibility: true,
-      });
+        daily_hours: isFreelancerForm ? Number(form.daily_hours || 0) : 0,
+      };
+      if (isFreelancerForm) {
+        payload.scheduled_check_in = "";
+        payload.scheduled_check_out = "";
+      }
+      delete payload.schedule_type; // not a PB field
+      await pb.collection("employees").create(payload);
       setForm(BLANK);
       load();
     } catch (err) {
@@ -84,17 +94,25 @@ export default function Employees() {
     load();
   };
 
+  const isFreelancerForm = form.schedule_type === "freelancer";
+
   const saveEdit = async () => {
     setError("");
     try {
-      await pb.collection("employees").update(editing.id, {
+      const isEditFreelancer = Number(editing.daily_hours || 0) > 0;
+      const data = {
         full_name: editing.full_name,
         biometric_user_id: editing.biometric_user_id,
         role: editing.role,
-        scheduled_check_in: editing.scheduled_check_in,
-        scheduled_check_out: editing.scheduled_check_out,
+        scheduled_check_in: isEditFreelancer ? "" : editing.scheduled_check_in,
+        scheduled_check_out: isEditFreelancer ? "" : editing.scheduled_check_out,
+        daily_hours: isEditFreelancer ? Number(editing.daily_hours) : 0,
         work_days: Array.isArray(editing.work_days) ? editing.work_days : [],
-      });
+      };
+      if (editing.aadhar_card instanceof File) {
+        data.aadhar_card = editing.aadhar_card;
+      }
+      await pb.collection("employees").update(editing.id, data);
       setEditing(null);
       load();
     } catch (err) {
@@ -125,25 +143,63 @@ export default function Employees() {
           }
         />
         <label className="field">
-          Check-in
+          Aadhar Card
           <input
-            type="time"
-            value={form.scheduled_check_in}
+            type="file"
+            accept="image/*"
             onChange={(e) =>
-              setForm({ ...form, scheduled_check_in: e.target.value })
+              setForm({ ...form, aadhar_card: e.target.files[0] })
             }
           />
         </label>
         <label className="field">
-          Check-out
-          <input
-            type="time"
-            value={form.scheduled_check_out}
-            onChange={(e) =>
-              setForm({ ...form, scheduled_check_out: e.target.value })
-            }
-          />
+          Schedule
+          <select
+            value={form.schedule_type}
+            onChange={(e) => setForm({ ...form, schedule_type: e.target.value })}
+          >
+            <option value="fixed">Fixed Schedule</option>
+            <option value="freelancer">Freelancer</option>
+          </select>
         </label>
+        {isFreelancerForm ? (
+          <label className="field">
+            Daily Hours
+            <input
+              type="number"
+              min="1"
+              max="24"
+              step="0.5"
+              placeholder="e.g. 3"
+              value={form.daily_hours}
+              onChange={(e) => setForm({ ...form, daily_hours: e.target.value })}
+              required
+            />
+          </label>
+        ) : (
+          <>
+            <label className="field">
+              Check-in
+              <input
+                type="time"
+                value={form.scheduled_check_in}
+                onChange={(e) =>
+                  setForm({ ...form, scheduled_check_in: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              Check-out
+              <input
+                type="time"
+                value={form.scheduled_check_out}
+                onChange={(e) =>
+                  setForm({ ...form, scheduled_check_out: e.target.value })
+                }
+              />
+            </label>
+          </>
+        )}
         <label className="field">
           Work days <span className="muted-inline">(none = office default)</span>
           <DayPicker
@@ -171,125 +227,174 @@ export default function Employees() {
       {error && <p className="error">{error}</p>}
 
       <div className="table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Biometric ID</th>
-            <th>Schedule</th>
-            <th>Work days</th>
-            <th>Role</th>
-            <th>Active</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((emp) =>
-            editing?.id === emp.id ? (
-              <tr key={emp.id} className="editing">
-                <td>
-                  <input
-                    value={editing.full_name}
-                    onChange={(e) =>
-                      setEditing({ ...editing, full_name: e.target.value })
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Biometric ID</th>
+              <th>Aadhar Image</th>
+              <th>Schedule</th>
+              <th>Work days</th>
+              <th>Role</th>
+              <th>Active</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((emp) =>
+              editing?.id === emp.id ? (
+                <tr key={emp.id} className="editing">
+                  <td>
+                    <input
+                      value={editing.full_name}
+                      onChange={(e) =>
+                        setEditing({ ...editing, full_name: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>{emp.username}</td>
+                  <td>
+                    <input
+                      style={{ width: "6rem" }}
+                      value={editing.biometric_user_id}
+                      onChange={(e) =>
+                        setEditing({
+                          ...editing,
+                          biometric_user_id: e.target.value,
+                        })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ width: "8rem" }}
+                      onChange={(e) =>
+                        setEditing({
+                          ...editing,
+                          aadhar_card: e.target.files[0],
+                        })
+                      }
+                    />
+                    {emp.aadhar_card && !(editing.aadhar_card instanceof File) && (
+                      <div className="muted" style={{ fontSize: "0.8em", marginTop: "4px" }}>
+                        Replace existing
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {Number(editing.daily_hours || 0) > 0 ? (
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        step="0.5"
+                        style={{ width: "5rem" }}
+                        value={editing.daily_hours}
+                        onChange={(e) =>
+                          setEditing({ ...editing, daily_hours: e.target.value })
+                        }
+                      />
+                    ) : (
+                      <>
+                        <input
+                          type="time"
+                          value={editing.scheduled_check_in || ""}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              scheduled_check_in: e.target.value,
+                            })
+                          }
+                        />
+                        {" – "}
+                        <input
+                          type="time"
+                          value={editing.scheduled_check_out || ""}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              scheduled_check_out: e.target.value,
+                            })
+                          }
+                        />
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    <DayPicker
+                      days={editing.work_days}
+                      onChange={(wd) => setEditing({ ...editing, work_days: wd })}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={editing.role}
+                      onChange={(e) =>
+                        setEditing({ ...editing, role: e.target.value })
+                      }
+                    >
+                      <option value="employee">employee</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </td>
+                  <td>{emp.active ? "Yes" : "No"}</td>
+                  <td>
+                    <button className="link" onClick={saveEdit}>
+                      <Check /> Save
+                    </button>
+                    <button className="link" onClick={() => setEditing(null)}>
+                      <X /> Cancel
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={emp.id}>
+                  <td>{emp.full_name}</td>
+                  <td>{emp.username}</td>
+                  <td>{emp.biometric_user_id || "—"}</td>
+                  <td>
+                    {emp.aadhar_card ? (
+                      <a href={pb.files.getUrl(emp, emp.aadhar_card)} target="_blank" rel="noreferrer" className="link">
+                        View
+                      </a>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {Number(emp.daily_hours || 0) > 0
+                      ? `Freelancer (${emp.daily_hours}h/day)`
+                      : <>
+                        {emp.scheduled_check_in || "—"}
+                        {emp.scheduled_check_in ? " – " : ""}
+                        {emp.scheduled_check_out || ""}
+                      </>
                     }
-                  />
-                </td>
-                <td>{emp.username}</td>
-                <td>
-                  <input
-                    style={{ width: "6rem" }}
-                    value={editing.biometric_user_id}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        biometric_user_id: e.target.value,
-                      })
-                    }
-                  />
-                </td>
-                <td>
-                  <input
-                    type="time"
-                    value={editing.scheduled_check_in || ""}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        scheduled_check_in: e.target.value,
-                      })
-                    }
-                  />
-                  {" – "}
-                  <input
-                    type="time"
-                    value={editing.scheduled_check_out || ""}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        scheduled_check_out: e.target.value,
-                      })
-                    }
-                  />
-                </td>
-                <td>
-                  <DayPicker
-                    days={editing.work_days}
-                    onChange={(wd) => setEditing({ ...editing, work_days: wd })}
-                  />
-                </td>
-                <td>
-                  <select
-                    value={editing.role}
-                    onChange={(e) =>
-                      setEditing({ ...editing, role: e.target.value })
-                    }
-                  >
-                    <option value="employee">employee</option>
-                    <option value="admin">admin</option>
-                  </select>
-                </td>
-                <td>{emp.active ? "Yes" : "No"}</td>
-                <td>
-                  <button className="link" onClick={saveEdit}>
-                    <Check /> Save
-                  </button>
-                  <button className="link" onClick={() => setEditing(null)}>
-                    <X /> Cancel
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              <tr key={emp.id}>
-                <td>{emp.full_name}</td>
-                <td>{emp.username}</td>
-                <td>{emp.biometric_user_id || "—"}</td>
-                <td>
-                  {emp.scheduled_check_in || "—"}
-                  {emp.scheduled_check_in ? " – " : ""}
-                  {emp.scheduled_check_out || ""}
-                </td>
-                <td>
-                  {Array.isArray(emp.work_days) && emp.work_days.length
-                    ? emp.work_days.map((d) => DAY_LABELS[d][0]).join(" ")
-                    : <span className="muted">default</span>}
-                </td>
-                <td>{emp.role}</td>
-                <td>
-                  <button className="link" onClick={() => toggleActive(emp)}>
-                    {emp.active ? "Yes" : "No"}
-                  </button>
-                </td>
-                <td>
-                  <button className="link" onClick={() => setEditing({ ...emp })}>
-                    <Pencil /> Edit
-                  </button>
-                </td>
-              </tr>
-            )
-          )}
-        </tbody>
-      </table>
+                  </td>
+                  <td>
+                    {Array.isArray(emp.work_days) && emp.work_days.length
+                      ? emp.work_days.map((d) => DAY_LABELS[d][0]).join(" ")
+                      : <span className="muted">default</span>}
+                  </td>
+                  <td>{emp.role}</td>
+                  <td>
+                    <button className="link" onClick={() => toggleActive(emp)}>
+                      {emp.active ? "Yes" : "No"}
+                    </button>
+                  </td>
+                  <td>
+                    <button className="link" onClick={() => setEditing({ ...emp })}>
+                      <Pencil /> Edit
+                    </button>
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

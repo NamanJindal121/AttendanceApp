@@ -102,8 +102,10 @@ export default function AttendanceCalendar() {
         </label>
         {selected && (
           <span className="muted-inline">
-            Scheduled {selected.scheduled_check_in || "—"} –{" "}
-            {selected.scheduled_check_out || "—"}
+            {Number(selected.daily_hours || 0) > 0
+              ? `Freelancer — ${selected.daily_hours}h/day commitment`
+              : `Scheduled ${selected.scheduled_check_in || "—"} – ${selected.scheduled_check_out || "—"}`
+            }
           </span>
         )}
       </div>

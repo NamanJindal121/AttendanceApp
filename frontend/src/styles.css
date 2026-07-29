@@ -554,7 +554,7 @@ tr.editing td {
   background: #dcfce7;
   color: var(--green-dark);
 }
-.chip.late {
+.chip.late, .chip.shortfall {
   background: #fef3c7;
   color: #b45309;
 }
@@ -591,7 +591,7 @@ tr.editing td {
 .cal-cell.present {
   background: #dcfce7;
 }
-.cal-cell.present.is-late {
+.cal-cell.present.is-late, .cal-cell.present.is-shortfall {
   background: #fef3c7;
 }
 .cal-cell.absent {
