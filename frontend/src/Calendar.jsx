@@ -36,7 +36,7 @@ export default function Calendar({ records, employee, settings, today = new Date
 
   // Month summary counts (present / absent / late / shortfall).
   const summary = useMemo(() => {
-    let present = 0, absent = 0, late = 0, shortfall = 0;
+    let present = 0, absent = 0, late = 0, shortfall = 0, halfDay = 0;
     for (const week of weeks) {
       for (const cell of week) {
         if (!cell) continue;
@@ -46,12 +46,13 @@ export default function Calendar({ records, employee, settings, today = new Date
           present++;
           if (s.late) late++;
           if (s.shortfall) shortfall++;
+          if (s.halfDay) halfDay++;
         } else if (s.status === "absent") {
           absent++;
         }
       }
     }
-    return { present, absent, late, shortfall };
+    return { present, absent, late, shortfall, halfDay };
   }, [weeks, byDay, employee, settings, today]);
 
   const todayKey = dayKey(today);
@@ -74,6 +75,7 @@ export default function Calendar({ records, employee, settings, today = new Date
           ? <span className="chip shortfall">{summary.shortfall} shortfall</span>
           : <span className="chip late">{summary.late} late</span>
         }
+        <span className="chip half-day">{summary.halfDay} half-day</span>
         <span className="chip absent">{summary.absent} absent</span>
       </div>
 
@@ -89,15 +91,18 @@ export default function Calendar({ records, employee, settings, today = new Date
             const classes = ["cal-cell", s.status];
             if (s.late) classes.push("is-late");
             if (s.shortfall) classes.push("is-shortfall");
+            if (s.halfDay) classes.push("is-half-day");
             if (key === todayKey) classes.push("is-today");
             return (
               <div key={key} className={classes.join(" ")} title={label(s)}>
                 <span className="cal-daynum">{cell.getDate()}</span>
                 {s.status === "present" && (
                   <span className="cal-tag">
-                    {s.isFreelancer
-                      ? formatWorkedTime(s.workedMinutes)
-                      : (s.late ? formatLateBy(s.lateBy) : "Present")
+                    {s.halfDay
+                      ? "Half day"
+                      : s.isFreelancer
+                        ? formatWorkedTime(s.workedMinutes)
+                        : (s.late ? formatLateBy(s.lateBy) : "Present")
                     }
                     {s.noCheckout && <span className="cal-nocheckout" title="No check-out">*</span>}
                   </span>
@@ -125,6 +130,9 @@ export default function Calendar({ records, employee, settings, today = new Date
 
 function label(s) {
   if (s.status === "present") {
+    if (s.halfDay) {
+      return "Half day" + (s.isFreelancer ? " — Worked " + formatWorkedTime(s.workedMinutes) : "") + (s.noCheckout ? " — no check-out" : "");
+    }
     if (s.isFreelancer) {
       return "Worked " + formatWorkedTime(s.workedMinutes) + (s.shortfall ? " (shortfall)" : "") + (s.noCheckout ? " — no check-out" : "");
     }

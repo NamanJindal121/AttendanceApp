@@ -54,21 +54,21 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
   const records = dayRecords || [];
   // Sort ALL records by timestamp ascending to calculate exact time worked
   const sortedRecords = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  
+
   const checkIns = sortedRecords.filter((r) => r.type === "check_in");
   const checkOuts = sortedRecords.filter((r) => r.type === "check_out");
 
   // Future day: don't judge it yet.
   const todayKey = dayKey(today);
   if (dateStr > todayKey) {
-    return { status: "future", late: false, lateBy: 0, noCheckout: false, workedMinutes: 0, shortfall: false };
+    return { status: "future", late: false, lateBy: 0, noCheckout: false, workedMinutes: 0, shortfall: false, halfDay: false };
   }
 
   if (checkIns.length > 0) {
     // Calculate total time worked
     let workedMinutes = 0;
     let currentIn = null;
-    
+
     for (const r of sortedRecords) {
       if (r.type === "check_in") {
         if (!currentIn) currentIn = new Date(r.timestamp);
@@ -86,8 +86,10 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
     // Check if freelancer mode (daily_hours > 0)
     const dailyHours = Number(employee?.daily_hours || 0);
     if (dailyHours > 0) {
-      const shortfall = workedMinutes < (dailyHours * 60);
-      return { status: "present", late: false, lateBy: 0, noCheckout, workedMinutes, shortfall, isFreelancer: true };
+      const shortfall = workedMinutes < (dailyHours * 60 - 15); // 15 minutes grace for freelancer
+      // Half-day: worked less than half the daily commitment
+      const halfDay = !noCheckout && workedMinutes < (dailyHours * 60 / 2);
+      return { status: "present", late: false, lateBy: 0, noCheckout, workedMinutes, shortfall, halfDay, isFreelancer: true };
     }
 
     // Fixed Schedule Mode
@@ -101,8 +103,17 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
       const over = firstMin - sched;
       if (over > grace) lateBy = over;
     }
-    
-    return { status: "present", late: lateBy > 0, lateBy, noCheckout, workedMinutes, shortfall: false, isFreelancer: false };
+
+    // Half-day: last check-out is more than 1hr before scheduled check-out
+    let halfDay = false;
+    const schedOut = parseHHMM(employee?.scheduled_check_out);
+    if (schedOut !== null && checkOuts.length > 0 && !noCheckout) {
+      const lastOut = new Date(checkOuts[checkOuts.length - 1].timestamp);
+      const lastOutMin = lastOut.getHours() * 60 + lastOut.getMinutes();
+      if (schedOut - lastOutMin > 60) halfDay = true;
+    }
+
+    return { status: "present", late: lateBy > 0, lateBy, noCheckout, workedMinutes, shortfall: false, halfDay, isFreelancer: false };
   }
 
   // No check-in: absent on a work day, neutral otherwise.
@@ -113,6 +124,7 @@ export function dayStatus(dateStr, dayRecords, employee, settings, today) {
     noCheckout: false,
     workedMinutes: 0,
     shortfall: false,
+    halfDay: false,
     isFreelancer: Number(employee?.daily_hours || 0) > 0,
   };
 }

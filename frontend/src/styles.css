@@ -558,6 +558,10 @@ tr.editing td {
   background: #fef3c7;
   color: #b45309;
 }
+.chip.half-day {
+  background: #ffedd5;
+  color: #c2410c;
+}
 .chip.absent {
   background: #fee2e2;
   color: var(--red-dark);
@@ -593,6 +597,9 @@ tr.editing td {
 }
 .cal-cell.present.is-late, .cal-cell.present.is-shortfall {
   background: #fef3c7;
+}
+.cal-cell.present.is-half-day {
+  background: #ffedd5;
 }
 .cal-cell.absent {
   background: #fee2e2;
