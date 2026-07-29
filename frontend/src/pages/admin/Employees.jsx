@@ -3,9 +3,10 @@ import { UserPlus, Pencil, Check, X } from "lucide-react";
 import { pb } from "../../pb";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EMAIL_DOMAIN = "@jindal.biz";
 
 const BLANK = {
-  email: "",
+  username: "",
   full_name: "",
   biometric_user_id: "",
   role: "employee",
@@ -67,6 +68,7 @@ export default function Employees() {
     try {
       await pb.collection("employees").create({
         ...form,
+        email: `${form.username}${EMAIL_DOMAIN}`,
         passwordConfirm: form.password,
         emailVisibility: true,
       });
@@ -110,10 +112,9 @@ export default function Employees() {
           required
         />
         <input
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          placeholder="Username"
+          value={form.username}
+          onChange={(e) => setForm({ ...form, username: e.target.value })}
           required
         />
         <input
@@ -174,7 +175,7 @@ export default function Employees() {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Email</th>
+            <th>Username</th>
             <th>Biometric ID</th>
             <th>Schedule</th>
             <th>Work days</th>
@@ -195,7 +196,7 @@ export default function Employees() {
                     }
                   />
                 </td>
-                <td>{emp.email}</td>
+                <td>{emp.username}</td>
                 <td>
                   <input
                     style={{ width: "6rem" }}
@@ -261,7 +262,7 @@ export default function Employees() {
             ) : (
               <tr key={emp.id}>
                 <td>{emp.full_name}</td>
-                <td>{emp.email}</td>
+                <td>{emp.username}</td>
                 <td>{emp.biometric_user_id || "—"}</td>
                 <td>
                   {emp.scheduled_check_in || "—"}
