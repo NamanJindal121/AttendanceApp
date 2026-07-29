@@ -21,7 +21,6 @@ Config via environment (see bridge/.env.example):
   STATE_FILE  (local buffer + seen-punch marker)
 """
 
-from datetime import timedelta
 import json
 import os
 import sys
@@ -143,14 +142,16 @@ def read_device_punches():
         conn = zk.connect()
         conn.disable_device()
         for att in conn.get_attendance():
-            ts = att.timestamp - timedelta(hours=5, minutes=30)
-            ts = ts.strftime("%Y-%m-%d %H:%M:%S")
+            # Original naive string for idempotency ID to prevent duplicates
+            raw_ts = att.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            # Proper ISO8601 string for PocketBase parsing
+            iso_ts = att.timestamp.strftime("%Y-%m-%dT%H:%M:%S+05:30")
             uid = str(att.user_id)
             punches.append(
                 {
                     "biometric_user_id": uid,
-                    "timestamp": f"{ts}",
-                    "device_punch_id": f"{DEVICE_SERIAL}:{uid}:{ts}",
+                    "timestamp": iso_ts,
+                    "device_punch_id": f"{DEVICE_SERIAL}:{uid}:{raw_ts}",
                 }
             )
     finally:
