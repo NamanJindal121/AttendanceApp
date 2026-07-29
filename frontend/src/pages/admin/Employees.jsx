@@ -57,7 +57,7 @@ export default function Employees() {
   const load = () =>
     pb
       .collection("employees")
-      .getFullList({ sort: "full_name" })
+      .getFullList({ filter: "active = true", sort: "full_name" })
       .then(setList)
       .catch(() => { });
 

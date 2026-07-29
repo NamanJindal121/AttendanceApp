@@ -29,7 +29,7 @@ export default function AttendanceCalendar() {
   // Load the employee list + office settings once.
   useEffect(() => {
     pb.collection("employees")
-      .getFullList({ sort: "full_name" })
+      .getFullList({ filter: "active = true", sort: "full_name" })
       .then((list) => {
         setEmployees(list);
         if (list[0]) setSelectedId(list[0].id);
