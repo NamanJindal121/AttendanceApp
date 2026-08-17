@@ -7,29 +7,41 @@
 //     unset keeps the fixed-schedule behaviour.
 //   employees.aadhar_card : scanned Aadhar card image, uploaded from the
 //     employee form (the file input accepts image/* only).
+//
+// IDEMPOTENT: on deployments where these fields were already added by hand
+// through the PocketBase admin UI, each one is skipped rather than duplicated,
+// and whatever configuration the admin chose there is left untouched. Only a
+// genuinely missing field is created.
 migrate((app) => {
   const employees = app.findCollectionByNameOrId("employees");
+  let changed = false;
 
-  employees.fields.add(
-    new Field({
-      name: "daily_hours",
-      type: "number",
-      min: 0,
-      max: 24,
-    })
-  );
+  if (!employees.fields.getByName("daily_hours")) {
+    employees.fields.add(
+      new Field({
+        name: "daily_hours",
+        type: "number",
+        min: 0,
+        max: 24,
+      })
+    );
+    changed = true;
+  }
 
-  employees.fields.add(
-    new Field({
-      name: "aadhar_card",
-      type: "file",
-      maxSelect: 1,
-      maxSize: 5242880, // 5MB
-      mimeTypes: ["image/jpeg", "image/png", "image/webp"],
-    })
-  );
+  if (!employees.fields.getByName("aadhar_card")) {
+    employees.fields.add(
+      new Field({
+        name: "aadhar_card",
+        type: "file",
+        maxSelect: 1,
+        maxSize: 5242880, // 5MB
+        mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+      })
+    );
+    changed = true;
+  }
 
-  app.save(employees);
+  if (changed) app.save(employees);
 }, (app) => {
   const employees = app.findCollectionByNameOrId("employees");
   employees.fields.removeByName("daily_hours");
