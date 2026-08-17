@@ -59,7 +59,7 @@ tunnel. Nothing connects *in* to the PC, so no public address/ports are needed.
 
 On the office PC:
 
-1. Download the **Windows** PocketBase build (v0.28.4) from
+1. Download the **Windows** PocketBase build (v0.39.11) from
    https://github.com/pocketbase/pocketbase/releases → unzip to `E:\attendance\`
    so you have `E:\attendance\pocketbase.exe`.
 2. Get the app code (hooks + migrations). Easiest: install Git for Windows, then:
