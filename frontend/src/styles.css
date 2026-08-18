@@ -949,6 +949,7 @@ button {
 }
 .drp-preset {
   text-align: left;
+  justify-content: flex-start;
   padding: 0.55rem 1rem;
   font-size: 0.85rem;
   color: var(--ink);
@@ -1070,7 +1071,17 @@ button {
   border-radius: 0 6px 6px 0;
 }
 .drp-nav {
-  align-self: center;
+  align-self: flex-start;
+  margin-top: 1.4rem;
+  background: none;
+  color: var(--gray);
+  box-shadow: none;
+  padding: 0.25rem;
+}
+.drp-nav:hover:not(:disabled) {
+  background: #eef2f7;
+  color: var(--ink);
+  transform: none;
 }
 .drp-actions {
   display: flex;
@@ -1100,9 +1111,15 @@ button.ghost:hover:not(:disabled) {
 }
 
 /* ---------------------------------------------------------------------------
-   Consolidated report matrix — employees down, every day in range across.
+   Consolidated report matrix — dates down, one column per employee.
    Cell colours deliberately mirror .cal-cell so the two views read the same.
 --------------------------------------------------------------------------- */
+.matrix-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius);
+}
 .table.matrix {
   border-collapse: separate;
   border-spacing: 0;
@@ -1110,9 +1127,10 @@ button.ghost:hover:not(:disabled) {
 }
 .table.matrix th,
 .table.matrix td {
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.5rem;
   white-space: nowrap;
 }
+/* Date column stays put while scrolling sideways through employees. */
 .table.matrix .sticky-col {
   position: sticky;
   left: 0;
@@ -1120,21 +1138,34 @@ button.ghost:hover:not(:disabled) {
   background: var(--card);
   border-right: 1px solid var(--line);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  text-align: left;
 }
-.table.matrix thead .sticky-col {
+/* Employee header row stays put while scrolling down through dates. */
+.table.matrix thead th {
+  position: sticky;
+  top: 0;
   z-index: 3;
   background: #f8fafc;
+}
+.table.matrix thead .sticky-col {
+  z-index: 4;
 }
 .table.matrix tbody tr:hover .sticky-col {
   background: #f8fafc;
 }
-.matrix-date {
+.matrix-emp {
   text-align: center !important;
-  font-size: 0.65rem !important;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.68rem !important;
 }
-.matrix-date span {
-  display: block;
+.matrix-daycol .matrix-dow {
+  display: inline-block;
+  width: 2.2em;
+  color: #94a3b8;
+  font-weight: 400;
 }
 .matrix-dow {
   color: #94a3b8;
@@ -1142,11 +1173,11 @@ button.ghost:hover:not(:disabled) {
 }
 .matrix-cell {
   text-align: center !important;
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #334155;
   border-right: 1px solid #f1f5f9;
-  min-width: 62px;
+  min-width: 76px;
 }
 .matrix-cell.present {
   background: #dcfce7;
@@ -1166,6 +1197,25 @@ button.ghost:hover:not(:disabled) {
 }
 .matrix-cell.future {
   background: #fff;
+}
+.table.matrix tr.is-weekend .sticky-col {
+  color: var(--gray);
+}
+.table.matrix tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #f8fafc;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.table.matrix tfoot .sticky-col {
+  z-index: 4;
+  background: #f8fafc;
+}
+.matrix-total {
+  text-align: center !important;
 }
 .dot.is-half-day {
   background: #ffedd5;

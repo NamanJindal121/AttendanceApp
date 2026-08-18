@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Download, Table2, List } from "lucide-react";
+import { Search, Download, FileDown, Table2, List } from "lucide-react";
 import { pb } from "../../pb";
 import DateRangePicker from "../../DateRangePicker";
 import { dayKey, dayStatus, groupByDay, statusText } from "../../attendance";
@@ -44,6 +44,7 @@ export default function Report() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState("log"); // "log" | "matrix"
+  const [exporting, setExporting] = useState(false);
 
   const load = async (f = from, t = to) => {
     setLoading(true);
@@ -86,42 +87,36 @@ export default function Report() {
 
   const dates = useMemo(() => daysInRange(from, to), [from, to]);
 
-  // employeeId -> { "YYYY-MM-DD": dayStatus } for the whole range. Uses the
-  // same dayStatus() the month calendar uses, so the values match exactly.
+  // One row per date, one column per employee. Statuses come from the same
+  // dayStatus() the month calendar uses, so the values match it exactly.
   const matrix = useMemo(() => {
-    if (!settings) return [];
+    if (!settings || employees.length === 0) return [];
     const byEmp = {};
     for (const r of rows) {
       (byEmp[r.employee] ||= []).push(r);
     }
+    const byDayPerEmp = employees.map((emp) => groupByDay(byEmp[emp.id] || []));
     const today = new Date();
-    return employees.map((emp) => {
-      const byDay = groupByDay(byEmp[emp.id] || []);
-      return {
-        employee: emp,
-        cells: dates.map((d) => ({
-          date: d,
-          status: dayStatus(d, byDay[d], emp, settings, today),
-        })),
-      };
-    });
+    return dates.map((d) => ({
+      date: d,
+      cells: employees.map((emp, i) => ({
+        employeeId: emp.id,
+        status: dayStatus(d, byDayPerEmp[i][d], emp, settings, today),
+      })),
+    }));
   }, [rows, employees, settings, dates]);
 
-  const exportCsv = () => {
+  const doExport = async () => {
     if (view === "matrix") {
-      const header = csvRow(["Employee", ...dates]);
-      const lines = matrix.map((r) =>
-        csvRow([
-          r.employee.full_name,
-          ...r.cells.map((c) => {
-            const s = c.status;
-            if (s.status === "off") return "Off";
-            if (s.status === "future") return "";
-            return statusText(s) + (s.noCheckout ? " *" : "");
-          }),
-        ])
-      );
-      download(`attendance_consolidated_${from}_${to}.csv`, [header, ...lines].join("\n"));
+      // Loaded on demand: jsPDF is ~400kB and only an admin pressing Export
+      // ever needs it, so it stays out of the bundle every employee downloads.
+      setExporting(true);
+      try {
+        const { exportMatrixPdf } = await import("../../reportPdf");
+        exportMatrixPdf({ matrix, employees, from, to });
+      } finally {
+        setExporting(false);
+      }
       return;
     }
     const header = csvRow(["employee", "type", "timestamp", "source", "flagged"]);
@@ -149,13 +144,15 @@ export default function Report() {
         <button onClick={() => setView(view === "log" ? "matrix" : "log")}>
           {view === "log" ? <><Table2 /> Consolidated report</> : <><List /> Punch log</>}
         </button>
-        <button onClick={exportCsv} disabled={empty}>
-          <Download /> Export CSV
+        <button onClick={doExport} disabled={empty || exporting}>
+          {view === "matrix"
+            ? <><FileDown /> {exporting ? "Preparing…" : "Export PDF"}</>
+            : <><Download /> Export CSV</>}
         </button>
       </div>
 
       {view === "matrix" ? (
-        <ConsolidatedTable matrix={matrix} dates={dates} loading={loading} />
+        <ConsolidatedTable matrix={matrix} employees={employees} loading={loading} />
       ) : (
         <PunchLog rows={rows} />
       )}
@@ -163,53 +160,76 @@ export default function Report() {
   );
 }
 
-// Employees down the side, every day in the range across the top. Each cell
-// carries the same text and colour as that day in the employee's calendar.
-function ConsolidatedTable({ matrix, dates, loading }) {
-  if (!loading && matrix.length === 0) {
+// Dates down the side, one column per active employee. Each cell carries the
+// same text and colour as that day in the employee's own calendar.
+function ConsolidatedTable({ matrix, employees, loading }) {
+  if (!loading && employees.length === 0) {
     return <p className="muted">No active employees to report on.</p>;
   }
+  if (!loading && matrix.length === 0) {
+    return <p className="muted">Selected range contains no days.</p>;
+  }
+  // Days actually attended, per employee — the footer tally.
+  const presentTotals = employees.map(
+    (_, i) => matrix.filter((row) => row.cells[i]?.status.status === "present").length
+  );
+
   return (
     <>
-      <div className="table-wrap">
+      <div className="table-wrap matrix-wrap">
         <table className="table matrix">
           <thead>
             <tr>
-              <th className="sticky-col">Employee</th>
-              {dates.map((d) => {
-                const [y, m, day] = d.split("-").map(Number);
-                const dt = new Date(y, m - 1, day);
-                return (
-                  <th key={d} className="matrix-date">
-                    <span className="matrix-dow">
-                      {dt.toLocaleDateString(undefined, { weekday: "short" })}
-                    </span>
-                    <span>{dt.getDate()}/{m}</span>
-                  </th>
-                );
-              })}
+              <th className="sticky-col">Date</th>
+              {employees.map((e) => (
+                <th key={e.id} className="matrix-emp" title={e.full_name}>
+                  {e.full_name}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {matrix.map((row) => (
-              <tr key={row.employee.id}>
-                <td className="sticky-col">{row.employee.full_name}</td>
-                {row.cells.map((c) => {
-                  const s = c.status;
-                  const cls = ["matrix-cell", s.status];
-                  if (s.late) cls.push("is-late");
-                  if (s.halfDay) cls.push("is-half-day");
-                  if (s.shortfall) cls.push("is-shortfall");
-                  return (
-                    <td key={c.date} className={cls.join(" ")} title={c.date}>
-                      {statusText(s)}
-                      {s.noCheckout && <span className="cal-nocheckout" title="No check-out">*</span>}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {matrix.map((row) => {
+              const [y, m, d] = row.date.split("-").map(Number);
+              const dt = new Date(y, m - 1, d);
+              const weekend = dt.getDay() === 0;
+              return (
+                <tr key={row.date} className={weekend ? "is-weekend" : ""}>
+                  <td className="sticky-col matrix-daycol">
+                    <span className="matrix-dow">
+                      {dt.toLocaleDateString(undefined, { weekday: "short" })}
+                    </span>
+                    <span>
+                      {String(d).padStart(2, "0")}/{String(m).padStart(2, "0")}
+                    </span>
+                  </td>
+                  {row.cells.map((c) => {
+                    const s = c.status;
+                    const cls = ["matrix-cell", s.status];
+                    if (s.late) cls.push("is-late");
+                    if (s.halfDay) cls.push("is-half-day");
+                    if (s.shortfall) cls.push("is-shortfall");
+                    return (
+                      <td key={c.employeeId} className={cls.join(" ")}>
+                        {statusText(s)}
+                        {s.noCheckout && (
+                          <span className="cal-nocheckout" title="No check-out">*</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
+          <tfoot>
+            <tr>
+              <td className="sticky-col">Days present</td>
+              {presentTotals.map((n, i) => (
+                <td key={employees[i].id} className="matrix-total">{n}</td>
+              ))}
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div className="cal-legend">
