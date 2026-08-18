@@ -161,3 +161,16 @@ export function monthGrid(year, month) {
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   return weeks;
 }
+
+// The short text shown for a single day — used by both the month calendar cell
+// and the consolidated report cell, so the two can never drift apart.
+// Non-working and future days return "" and are styled by the caller.
+export function statusText(s) {
+  if (s.status === "present") {
+    if (s.halfDay) return "Half day";
+    if (s.isFreelancer) return formatWorkedTime(s.workedMinutes);
+    return s.late ? formatLateBy(s.lateBy) : "Present";
+  }
+  if (s.status === "absent") return "Absent";
+  return "";
+}

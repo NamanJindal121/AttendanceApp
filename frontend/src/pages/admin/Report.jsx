@@ -1,35 +1,91 @@
-import { useEffect, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, Download, FileDown, Table2, List } from "lucide-react";
 import { pb } from "../../pb";
+import DateRangePicker from "../../DateRangePicker";
+import { dayKey, dayStatus, groupByDay, statusText } from "../../attendance";
+import { daysInRange } from "../../dateRanges";
 
-// Default the date range to the last 7 days (yyyy-mm-dd for <input type=date>).
-function isoDate(d) {
-  return d.toISOString().slice(0, 10);
-}
+// Local calendar day for a Date. Deliberately NOT toISOString(), which is UTC
+// and rolls the date back a day for anyone east of Greenwich.
+const isoDate = (d) => dayKey(d);
+
+// PocketBase stores and compares timestamps in UTC, so a local calendar day
+// has to be converted before it goes into a filter. Pasting the local date in
+// raw offsets every boundary by the timezone — in IST that hides a punch made
+// between 00:00 and 05:29 from its own day.
+const utcBound = (day, endOfDay) =>
+  new Date(`${day}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    .toISOString()
+    .replace("T", " ");
+
+const csvRow = (cells) =>
+  cells
+    .map((c) => {
+      const v = c == null ? "" : String(c);
+      return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    })
+    .join(",");
+
+const download = (name, text) => {
+  const blob = new Blob([text], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 export default function Report() {
-  const [from, setFrom] = useState(
-    isoDate(new Date(Date.now() - 6 * 86400000))
-  );
+  const [from, setFrom] = useState(isoDate(new Date(Date.now() - 6 * 86400000)));
   const [to, setTo] = useState(isoDate(new Date()));
   const [rows, setRows] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState("log"); // "log" | "matrix"
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = async () => {
+  // Identifies the newest in-flight load. The PocketBase SDK auto-cancels a
+  // duplicate request, and a superseded one must not clobber the state (or
+  // raise an error) belonging to the request that replaced it.
+  const reqId = useRef(0);
+
+  const load = async (f = from, t = to) => {
+    const id = ++reqId.current;
     setLoading(true);
+    setError("");
     try {
-      // Inclusive range: from 00:00:00 to 23:59:59 of the selected days.
-      const filter = `timestamp >= "${from} 00:00:00" && timestamp <= "${to} 23:59:59"`;
-      const items = await pb.collection("attendance_records").getFullList({
-        filter,
-        sort: "-timestamp",
-        expand: "employee",
-      });
+      // Inclusive range: local midnight of `f` to local end-of-day of `t`,
+      // expressed in UTC so the bounds line up with the stored timestamps.
+      const filter = `timestamp >= "${utcBound(f, false)}" && timestamp <= "${utcBound(t, true)}"`;
+      const [items, emps, sets] = await Promise.all([
+        pb.collection("attendance_records").getFullList({
+          filter,
+          sort: "-timestamp",
+          expand: "employee",
+        }),
+        pb.collection("employees").getFullList({
+          filter: "active = true",
+          sort: "full_name",
+        }),
+        pb.collection("settings").getFullList({ limit: 1 }),
+      ]);
+      if (id !== reqId.current) return;
       setRows(items);
-    } catch (_) {
+      setEmployees(emps);
+      setSettings(sets[0] || null);
+    } catch (err) {
+      // An auto-cancelled or superseded request is not a failure.
+      if (err?.isAbort || id !== reqId.current) return;
+      // Never fall through to a rendered table on failure: an empty result set
+      // draws the consolidated view as every employee absent on every date,
+      // which is indistinguishable from a real month of absences.
       setRows([]);
+      setError("Could not load attendance for this range. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   };
 
@@ -38,40 +94,180 @@ export default function Report() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const exportCsv = () => {
-    const header = ["employee", "type", "timestamp", "source", "flagged"];
-    const lines = rows.map((r) => {
-      const name = r.expand?.employee?.full_name || r.employee;
-      return [name, r.type, r.timestamp, r.source, r.flagged].join(",");
-    });
-    const csv = [header.join(","), ...lines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `attendance_${from}_${to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const applyRange = (f, t) => {
+    setFrom(f);
+    setTo(t);
+    load(f, t);
   };
+
+  const dates = useMemo(() => daysInRange(from, to), [from, to]);
+
+  // One row per date, one column per employee. Statuses come from the same
+  // dayStatus() the month calendar uses, so the values match it exactly.
+  const matrix = useMemo(() => {
+    if (!settings || employees.length === 0) return [];
+    const byEmp = {};
+    for (const r of rows) {
+      (byEmp[r.employee] ||= []).push(r);
+    }
+    const byDayPerEmp = employees.map((emp) => groupByDay(byEmp[emp.id] || []));
+    const today = new Date();
+    return dates.map((d) => ({
+      date: d,
+      cells: employees.map((emp, i) => ({
+        employeeId: emp.id,
+        status: dayStatus(d, byDayPerEmp[i][d], emp, settings, today),
+      })),
+    }));
+  }, [rows, employees, settings, dates]);
+
+  const doExport = async () => {
+    if (view === "matrix") {
+      // Loaded on demand: jsPDF is ~400kB and only an admin pressing Export
+      // ever needs it, so it stays out of the bundle every employee downloads.
+      setExporting(true);
+      try {
+        const { exportMatrixPdf } = await import("../../reportPdf");
+        exportMatrixPdf({ matrix, employees, from, to });
+      } catch (_) {
+        // The exporter is deliberately not precached by the service worker, so
+        // this is the expected failure when offline.
+        setError("Could not load the PDF exporter. It needs a connection the first time it is used.");
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
+    const header = csvRow(["employee", "type", "timestamp", "source", "flagged"]);
+    const lines = rows.map((r) =>
+      csvRow([
+        r.expand?.employee?.full_name || r.employee,
+        r.type,
+        r.timestamp,
+        r.source,
+        r.flagged,
+      ])
+    );
+    download(`attendance_${from}_${to}.csv`, [header, ...lines].join("\n"));
+  };
+
+  const empty = view === "matrix" ? matrix.length === 0 : rows.length === 0;
 
   return (
     <div className="pad">
       <div className="filters">
-        <label>
-          From <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label>
-          To <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        <button onClick={load} disabled={loading}>
-          <Search /> {loading ? "…" : "Apply"}
+        <DateRangePicker from={from} to={to} onApply={applyRange} />
+        <button onClick={() => load()} disabled={loading}>
+          <Search /> {loading ? "…" : "Refresh"}
         </button>
-        <button onClick={exportCsv} disabled={rows.length === 0}>
-          <Download /> Export CSV
+        <button onClick={() => setView(view === "log" ? "matrix" : "log")}>
+          {view === "log" ? <><Table2 /> Consolidated report</> : <><List /> Punch log</>}
+        </button>
+        <button onClick={doExport} disabled={empty || exporting}>
+          {view === "matrix"
+            ? <><FileDown /> {exporting ? "Preparing…" : "Export PDF"}</>
+            : <><Download /> Export CSV</>}
         </button>
       </div>
 
-      <div className="table-wrap">
+      {error ? (
+        <p className="error">{error}</p>
+      ) : view === "matrix" ? (
+        <ConsolidatedTable matrix={matrix} employees={employees} loading={loading} />
+      ) : (
+        <PunchLog rows={rows} />
+      )}
+    </div>
+  );
+}
+
+// Dates down the side, one column per active employee. Each cell carries the
+// same text and colour as that day in the employee's own calendar.
+function ConsolidatedTable({ matrix, employees, loading }) {
+  if (!loading && employees.length === 0) {
+    return <p className="muted">No active employees to report on.</p>;
+  }
+  if (!loading && matrix.length === 0) {
+    return <p className="muted">Selected range contains no days.</p>;
+  }
+  // Days actually attended, per employee — the footer tally.
+  const presentTotals = employees.map(
+    (_, i) => matrix.filter((row) => row.cells[i]?.status.status === "present").length
+  );
+
+  return (
+    <>
+      <div className="table-wrap matrix-wrap">
+        <table className="table matrix">
+          <thead>
+            <tr>
+              <th className="sticky-col">Date</th>
+              {employees.map((e) => (
+                <th key={e.id} className="matrix-emp" title={e.full_name}>
+                  {e.full_name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row) => {
+              const [y, m, d] = row.date.split("-").map(Number);
+              const dt = new Date(y, m - 1, d);
+              const weekend = dt.getDay() === 0;
+              return (
+                <tr key={row.date} className={weekend ? "is-weekend" : ""}>
+                  <td className="sticky-col matrix-daycol">
+                    <span className="matrix-dow">
+                      {dt.toLocaleDateString(undefined, { weekday: "short" })}
+                    </span>
+                    <span>
+                      {String(d).padStart(2, "0")}/{String(m).padStart(2, "0")}
+                    </span>
+                  </td>
+                  {row.cells.map((c) => {
+                    const s = c.status;
+                    const cls = ["matrix-cell", s.status];
+                    if (s.late) cls.push("is-late");
+                    if (s.halfDay) cls.push("is-half-day");
+                    if (s.shortfall) cls.push("is-shortfall");
+                    return (
+                      <td key={c.employeeId} className={cls.join(" ")}>
+                        {statusText(s)}
+                        {s.noCheckout && (
+                          <span className="cal-nocheckout" title="No check-out">*</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="sticky-col">Days present</td>
+              {presentTotals.map((n, i) => (
+                <td key={employees[i].id} className="matrix-total">{n}</td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div className="cal-legend">
+        <span><i className="dot present" /> Present</span>
+        <span><i className="dot is-late" /> Late</span>
+        <span><i className="dot is-half-day" /> Half day</span>
+        <span><i className="dot absent" /> Absent</span>
+        <span><i className="dot off" /> Non-working</span>
+        <span>* = no check-out recorded</span>
+      </div>
+    </>
+  );
+}
+
+function PunchLog({ rows }) {
+  return (
+    <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -94,11 +290,7 @@ export default function Report() {
               </td>
               <td>
                 {r.selfie ? (
-                  <a
-                    href={pb.files.getURL(r, r.selfie)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  <a href={pb.files.getURL(r, r.selfie)} target="_blank" rel="noreferrer">
                     <img
                       className="selfie-thumb"
                       src={pb.files.getURL(r, r.selfie, { thumb: "100x100" })}
@@ -118,7 +310,6 @@ export default function Report() {
           )}
         </tbody>
       </table>
-      </div>
     </div>
   );
 }

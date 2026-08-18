@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, PencilLine } from "lucide-react";
+import { Plus, Trash2, PencilLine, Pencil, Check, X } from "lucide-react";
 import { pb } from "../../pb";
 import Calendar from "../../Calendar";
 import { dayKey } from "../../attendance";
@@ -19,12 +19,21 @@ export default function AttendanceCalendar() {
   const [type, setType] = useState("check_in");
   const [msg, setMsg] = useState(null);
 
+  // Inline correction of an existing punch. `editing` holds the record id being
+  // corrected plus its draft date/time/type; null when nothing is being edited.
+  const [editing, setEditing] = useState(null);
+
   const loadRecords = (empId) =>
     pb
       .collection("attendance_records")
       .getFullList({ filter: `employee = "${empId}"`, sort: "-timestamp" })
       .then(setRecords)
-      .catch(() => setRecords([]));
+      .catch((err) => {
+        // The SDK auto-cancels a duplicate request; letting that clear the list
+        // would blank the calendar behind whichever request superseded it.
+        if (err?.isAbort) return;
+        setRecords([]);
+      });
 
   // Load the employee list + office settings once.
   useEffect(() => {
@@ -41,8 +50,11 @@ export default function AttendanceCalendar() {
       .catch(() => {});
   }, []);
 
-  // (Re)load the selected employee's attendance.
+  // (Re)load the selected employee's attendance. Any correction in progress
+  // belongs to the previous employee, so drop it rather than let it reappear
+  // if they switch back.
   useEffect(() => {
+    setEditing(null);
     if (selectedId) loadRecords(selectedId);
   }, [selectedId]);
 
@@ -76,6 +88,39 @@ export default function AttendanceCalendar() {
       loadRecords(selectedId);
     } catch (err) {
       setMsg({ ok: false, text: "Could not delete." });
+    }
+  };
+
+  const startEdit = (r) => {
+    const d = new Date(r.timestamp);
+    setMsg(null);
+    setEditing({
+      id: r.id,
+      date: dayKey(d),
+      // Local HH:MM — the value the admin sees in the list, not the UTC one.
+      time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+      type: r.type,
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setMsg(null);
+    try {
+      // Same local-time -> UTC conversion the add form uses.
+      const ts = new Date(`${editing.date}T${editing.time}`).toISOString();
+      await pb.collection("attendance_records").update(editing.id, {
+        timestamp: ts,
+        type: editing.type,
+      });
+      setEditing(null);
+      setMsg({ ok: true, text: "Punch updated." });
+      loadRecords(selectedId);
+    } catch (err) {
+      setMsg({
+        ok: false,
+        text: err?.response?.message || "Could not update punch.",
+      });
     }
   };
 
@@ -150,38 +195,88 @@ export default function AttendanceCalendar() {
 
           <p className="muted">Punches on {date}:</p>
           <ul className="list">
-            {dayPunches.map((r) => (
-              <li key={r.id} className="row">
-                <span className={`badge ${r.type}`}>
-                  {r.type === "check_in" ? "IN" : "OUT"}
-                </span>
-                <span className="ts">
-                  {new Date(r.timestamp).toLocaleTimeString()}
-                </span>
-                <span className={`source ${r.source}`}>{r.source}</span>
-                {r.selfie && (
-                  <a
-                    href={pb.files.getURL(r, r.selfie)}
-                    target="_blank"
-                    rel="noreferrer"
+            {dayPunches.map((r) =>
+              editing?.id === r.id ? (
+                <li key={r.id} className="row editing">
+                  <input
+                    type="date"
+                    value={editing.date}
+                    onChange={(e) =>
+                      setEditing({ ...editing, date: e.target.value })
+                    }
+                  />
+                  <input
+                    type="time"
+                    value={editing.time}
+                    onChange={(e) =>
+                      setEditing({ ...editing, time: e.target.value })
+                    }
+                  />
+                  <select
+                    value={editing.type}
+                    onChange={(e) =>
+                      setEditing({ ...editing, type: e.target.value })
+                    }
                   >
-                    <img
-                      className="selfie-thumb"
-                      src={pb.files.getURL(r, r.selfie, { thumb: "100x100" })}
-                      alt="selfie"
-                    />
-                  </a>
-                )}
-                <button
-                  className="icon-btn danger"
-                  style={{ marginLeft: "auto" }}
-                  title="Delete punch"
-                  onClick={() => removePunch(r.id)}
-                >
-                  <Trash2 />
-                </button>
-              </li>
-            ))}
+                    <option value="check_in">check in</option>
+                    <option value="check_out">check out</option>
+                  </select>
+                  <button
+                    className="icon-btn"
+                    style={{ marginLeft: "auto" }}
+                    title="Save correction"
+                    onClick={saveEdit}
+                  >
+                    <Check />
+                  </button>
+                  <button
+                    className="icon-btn"
+                    title="Cancel"
+                    onClick={() => setEditing(null)}
+                  >
+                    <X />
+                  </button>
+                </li>
+              ) : (
+                <li key={r.id} className="row">
+                  <span className={`badge ${r.type}`}>
+                    {r.type === "check_in" ? "IN" : "OUT"}
+                  </span>
+                  <span className="ts">
+                    {new Date(r.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span className={`source ${r.source}`}>{r.source}</span>
+                  {r.selfie && (
+                    <a
+                      href={pb.files.getURL(r, r.selfie)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img
+                        className="selfie-thumb"
+                        src={pb.files.getURL(r, r.selfie, { thumb: "100x100" })}
+                        alt="selfie"
+                      />
+                    </a>
+                  )}
+                  <button
+                    className="icon-btn"
+                    style={{ marginLeft: "auto" }}
+                    title="Correct this punch"
+                    onClick={() => startEdit(r)}
+                  >
+                    <Pencil />
+                  </button>
+                  <button
+                    className="icon-btn danger"
+                    title="Delete punch"
+                    onClick={() => removePunch(r.id)}
+                  >
+                    <Trash2 />
+                  </button>
+                </li>
+              )
+            )}
             {dayPunches.length === 0 && (
               <li className="row muted">No punches on this date.</li>
             )}
