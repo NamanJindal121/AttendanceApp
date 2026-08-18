@@ -4,12 +4,18 @@ import { statusText } from "./attendance";
 
 // Deliberately monochrome: the report prints on any office printer and the
 // cell text ("Present", "Late by 1h 15m", "Absent", "Half day", an em dash for
-// a non-working day) already carries everything the colour fills used to.
+// a non-working day) already carries everything colour fills used to.
 const INK = [17, 17, 17];
 const HEAD = [68, 68, 68];
 const FOOT = [237, 237, 237];
 const RULE = [190, 190, 190];
 const GRAY = [110, 110, 110];
+
+// Fixed, readable type. The layout never shrinks to force a fit — it paginates
+// instead, which is what the grid of pages below is for.
+const FONT_SIZE = 7.5;
+const CELL_PADDING = 1.5;
+const DATE_COL_W = 19;
 
 const pretty = (key) => {
   const [y, m, d] = key.split("-").map(Number);
@@ -20,126 +26,157 @@ const pretty = (key) => {
   });
 };
 
+const cellText = (s) => {
+  const t = statusText(s);
+  if (!t) return s.status === "off" ? "—" : "";
+  return t + (s.noCheckout ? " *" : "");
+};
+
+const rowLabel = (key) => {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return (
+    dt.toLocaleDateString(undefined, { weekday: "short" }) +
+    " " +
+    String(d).padStart(2, "0") +
+    "/" +
+    String(m).padStart(2, "0")
+  );
+};
+
 // Build and download a formatted PDF of the consolidated matrix.
 //   matrix:    [{ date, cells: [{ employeeId, status }] }]  (rows = dates)
 //   employees: the column order matching each row's cells
+//
+// Portrait, so a page holds as many date rows as possible. Dates flow down and
+// paginate; employees flow across and paginate too, so a roster wider than the
+// page becomes a further set of pages rather than being squeezed. The result is
+// an n x m grid: m column-groups of employees, each running n pages of dates.
 export function exportMatrixPdf({ matrix, employees, from, to }) {
-  // Always portrait, and sized so the whole range fits on a single page where
-  // it can — that way one employee's record is read straight down one column
-  // without turning over.
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 10;
-  const tableTop = margin + 14;    // below the title band
-  const tableBottom = margin + 12; // above legend + page number
+  const tableTop = margin + 15;
+  const tableBottom = margin + 8;
 
-  const head = [["Date", ...employees.map((e) => e.full_name)]];
-
-  const body = matrix.map((row) => {
-    const [y, m, d] = row.date.split("-").map(Number);
-    const dt = new Date(y, m - 1, d);
-    const label =
-      dt.toLocaleDateString(undefined, { weekday: "short" }) +
-      " " +
-      String(d).padStart(2, "0") +
-      "/" +
-      String(m).padStart(2, "0");
-    return [
-      label,
-      ...row.cells.map((c) => {
-        const t = statusText(c.status);
-        if (!t) return c.status.status === "off" ? "—" : "";
-        return t + (c.status.noCheckout ? " *" : "");
-      }),
-    ];
-  });
-
-  const totals = employees.map(
-    (_, i) => matrix.filter((r) => r.cells[i]?.status.status === "present").length
-  );
-  const foot = [["Days present", ...totals.map(String)]];
-
-  // Shrink type/padding until every date row fits one page, down to a floor
-  // where it would stop being readable; past that it paginates as normal.
-  const PT_MM = 0.3528;
-  const LINE = 1.15;
-  const avail = pageH - tableTop - tableBottom;
-  const rowCount = body.length + 2; // + header + totals
-  let fontSize = 7.5;
-  let cellPadding = 1.5;
-  const rowHeight = () => fontSize * PT_MM * LINE + cellPadding * 2;
-  while (rowCount * rowHeight() > avail && fontSize > 4.6) {
-    fontSize -= 0.1;
-    cellPadding = Math.max(0.35, cellPadding - 0.045);
+  // How many employee columns fit at full size: measure the widest label that
+  // has to sit in one, rather than guessing a width.
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(FONT_SIZE);
+  let widest = 0;
+  for (const row of matrix) {
+    for (const c of row.cells) {
+      widest = Math.max(widest, doc.getTextWidth(cellText(c.status)));
+    }
   }
-  const dateColW = fontSize < 6 ? 16 : 19;
-  const bodyW = pageW - margin * 2 - dateColW;
-  const colW = bodyW / Math.max(employees.length, 1);
+  doc.setFont("helvetica", "bold");
+  for (const e of employees) {
+    widest = Math.max(widest, doc.getTextWidth(e.full_name));
+  }
+  const minColW = widest + CELL_PADDING * 2 + 1.5;
+  const bodyW = pageW - margin * 2 - DATE_COL_W;
+  const colsPerPage = Math.max(1, Math.floor(bodyW / minColW));
+  const colW = bodyW / colsPerPage;
 
-  autoTable(doc, {
-    head,
-    body,
-    foot,
-    startY: tableTop,
-    // top applies to continuation pages; without it the table would be drawn
-    // over the header band that didDrawPage stamps on every page.
-    margin: { top: tableTop, left: margin, right: margin, bottom: tableBottom },
-    theme: "grid",
-    showFoot: "lastPage",
-    styles: {
-      font: "helvetica",
-      fontSize,
-      cellPadding,
-      halign: "center",
-      valign: "middle",
-      textColor: INK,
-      lineColor: RULE,
-      lineWidth: 0.1,
-      overflow: "linebreak",
-    },
-    headStyles: {
-      fillColor: HEAD,
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      halign: "center",
-      fontSize: Math.min(fontSize, 6.8),
-      cellPadding: Math.max(cellPadding, 1),
-    },
-    footStyles: {
-      fillColor: FOOT,
-      textColor: INK,
-      fontStyle: "bold",
-      halign: "center",
-    },
-    columnStyles: {
-      0: { halign: "left", cellWidth: dateColW, fontStyle: "bold" },
-      ...Object.fromEntries(employees.map((_, i) => [i + 1, { cellWidth: colW }])),
-    },
-    didDrawPage: () => {
-      // Header band, repeated on every page.
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(...INK);
-      doc.text("Attendance Report", margin, margin + 4);
+  // Split the roster into page-width groups.
+  const groups = [];
+  for (let i = 0; i < employees.length; i += colsPerPage) {
+    groups.push({ start: i, list: employees.slice(i, i + colsPerPage) });
+  }
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(...GRAY);
-      doc.text(`${pretty(from)} — ${pretty(to)}`, margin, margin + 9.5);
+  // didDrawPage needs to know which group it is stamping a header for.
+  let current = groups[0];
 
-      const stamp = `Generated ${new Date().toLocaleString()}`;
-      doc.text(stamp, pageW - margin - doc.getTextWidth(stamp), margin + 9.5);
-    },
+  const drawHeader = () => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...INK);
+    doc.text("Attendance Report", margin, margin + 4);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...GRAY);
+    doc.text(`${pretty(from)} — ${pretty(to)}`, margin, margin + 9.5);
+
+    // Only worth saying when the roster actually spans more than one group.
+    if (groups.length > 1) {
+      const a = current.start + 1;
+      const b = current.start + current.list.length;
+      const label = `Employees ${a}–${b} of ${employees.length}`;
+      doc.text(label, pageW - margin - doc.getTextWidth(label), margin + 4);
+    }
+    const stamp = `Generated ${new Date().toLocaleString()}`;
+    doc.text(stamp, pageW - margin - doc.getTextWidth(stamp), margin + 9.5);
+
+    // Key, repeated on every page so no page is orphaned from its notation.
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY);
+    doc.text(
+      "—  non-working day        *  no check-out recorded",
+      margin,
+      pageH - 6
+    );
+  };
+
+  groups.forEach((group, gi) => {
+    current = group;
+    if (gi > 0) doc.addPage();
+
+    const head = [["Date", ...group.list.map((e) => e.full_name)]];
+    const body = matrix.map((row) => [
+      rowLabel(row.date),
+      ...group.list.map((_, i) => cellText(row.cells[group.start + i].status)),
+    ]);
+    const totals = group.list.map(
+      (_, i) =>
+        matrix.filter(
+          (r) => r.cells[group.start + i]?.status.status === "present"
+        ).length
+    );
+
+    autoTable(doc, {
+      head,
+      body,
+      foot: [["Days present", ...totals.map(String)]],
+      startY: tableTop,
+      // top applies to continuation pages; without it the table would be drawn
+      // over the header band that didDrawPage stamps on every page.
+      margin: { top: tableTop, left: margin, right: margin, bottom: tableBottom },
+      theme: "grid",
+      showFoot: "lastPage",
+      styles: {
+        font: "helvetica",
+        fontSize: FONT_SIZE,
+        cellPadding: CELL_PADDING,
+        halign: "center",
+        valign: "middle",
+        textColor: INK,
+        lineColor: RULE,
+        lineWidth: 0.1,
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: HEAD,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center",
+      },
+      footStyles: {
+        fillColor: FOOT,
+        textColor: INK,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      columnStyles: {
+        0: { halign: "left", cellWidth: DATE_COL_W, fontStyle: "bold" },
+        ...Object.fromEntries(
+          group.list.map((_, i) => [i + 1, { cellWidth: colW }])
+        ),
+      },
+      didDrawPage: drawHeader,
+    });
   });
-
-  // Legend under the table, on whatever page it ended on. Clamped into the
-  // bottom margin the table already reserves, so a table that runs to the foot
-  // of the page never pushes a legend-only page after it.
-  const y = Math.min((doc.lastAutoTable?.finalY ?? margin) + 6, pageH - 13);
-  doc.setFontSize(7.5);
-  doc.setTextColor(...GRAY);
-  doc.text("\u2014  non-working day        *  no check-out recorded", margin, y);
 
   // Page numbers last: the total is only known once every page exists.
   const pageCount = doc.internal.getNumberOfPages();
