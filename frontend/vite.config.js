@@ -22,6 +22,18 @@ export default defineConfig({
       workbox: {
         navigateFallbackDenylist: [/^\/api/, /^\/_/],
         runtimeCaching: [],
+        // Keep the PDF machinery out of the precache. reportPdf is imported
+        // dynamically and only an admin exporting ever needs it; jsPDF drags
+        // in html2canvas and dompurify behind its own dynamic imports. Left in
+        // the manifest the service worker downloads ~800kB of it onto every
+        // employee's phone at install, which defeats the dynamic import
+        // entirely. These are still served normally over the network.
+        globIgnores: [
+          "**/reportPdf-*.js",
+          "**/index.es-*.js",
+          "**/html2canvas.esm-*.js",
+          "**/purify.es-*.js",
+        ],
       },
       manifest: {
         name: "Office Attendance",
