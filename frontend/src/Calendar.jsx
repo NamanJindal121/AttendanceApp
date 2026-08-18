@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy, formatWorkedTime } from "./attendance";
+import { dayKey, groupByDay, dayStatus, monthGrid, formatLateBy, formatWorkedTime, statusText } from "./attendance";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -96,18 +96,12 @@ export default function Calendar({ records, employee, settings, today = new Date
             return (
               <div key={key} className={classes.join(" ")} title={label(s)}>
                 <span className="cal-daynum">{cell.getDate()}</span>
-                {s.status === "present" && (
+                {(s.status === "present" || s.status === "absent") && (
                   <span className="cal-tag">
-                    {s.halfDay
-                      ? "Half day"
-                      : s.isFreelancer
-                        ? formatWorkedTime(s.workedMinutes)
-                        : (s.late ? formatLateBy(s.lateBy) : "Present")
-                    }
+                    {statusText(s)}
                     {s.noCheckout && <span className="cal-nocheckout" title="No check-out">*</span>}
                   </span>
                 )}
-                {s.status === "absent" && <span className="cal-tag">Absent</span>}
               </div>
             );
           })
