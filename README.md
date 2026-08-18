@@ -30,7 +30,7 @@ deploy/     SELFHOST-WINDOWS.md — full self-host setup guide
 ## Local development
 
 The PocketBase binary is platform-specific and not committed — download the one
-for your OS from https://github.com/pocketbase/pocketbase/releases (v0.28.4)
+for your OS from https://github.com/pocketbase/pocketbase/releases (v0.39.11)
 and place it in `backend/`.
 
 ```bash
