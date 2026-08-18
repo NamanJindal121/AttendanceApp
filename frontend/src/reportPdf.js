@@ -2,32 +2,14 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { statusText } from "./attendance";
 
-// Cell fills mirror the on-screen matrix (and therefore the month calendar),
-// so a printed report reads the same as the app.
-const FILL = {
-  present: [220, 252, 231],
-  late: [254, 243, 199],
-  halfDay: [255, 237, 213],
-  absent: [254, 226, 226],
-  off: [241, 245, 249],
-  future: [255, 255, 255],
-};
-const INK = [51, 65, 85];
-const BLUE = [37, 99, 235];
-const GRAY = [107, 114, 128];
-
-// Which fill a day's status earns. Kept separate from the text so the colour
-// and the label can never disagree.
-function fillFor(s) {
-  if (s.status === "present") {
-    if (s.halfDay) return FILL.halfDay;
-    if (s.late || s.shortfall) return FILL.late;
-    return FILL.present;
-  }
-  if (s.status === "absent") return FILL.absent;
-  if (s.status === "off") return FILL.off;
-  return FILL.future;
-}
+// Deliberately monochrome: the report prints on any office printer and the
+// cell text ("Present", "Late by 1h 15m", "Absent", "Half day", an em dash for
+// a non-working day) already carries everything the colour fills used to.
+const INK = [17, 17, 17];
+const HEAD = [68, 68, 68];
+const FOOT = [237, 237, 237];
+const RULE = [190, 190, 190];
+const GRAY = [110, 110, 110];
 
 const pretty = (key) => {
   const [y, m, d] = key.split("-").map(Number);
@@ -42,16 +24,15 @@ const pretty = (key) => {
 //   matrix:    [{ date, cells: [{ employeeId, status }] }]  (rows = dates)
 //   employees: the column order matching each row's cells
 export function exportMatrixPdf({ matrix, employees, from, to }) {
-  // Past ~6 employees the columns stop fitting a portrait page.
-  const landscape = employees.length > 6;
-  const doc = new jsPDF({
-    orientation: landscape ? "landscape" : "portrait",
-    unit: "mm",
-    format: "a4",
-  });
+  // Always portrait, and sized so the whole range fits on a single page where
+  // it can — that way one employee's record is read straight down one column
+  // without turning over.
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 12;
+  const margin = 10;
+  const tableTop = margin + 14;    // below the title band
+  const tableBottom = margin + 12; // above legend + page number
 
   const head = [["Date", ...employees.map((e) => e.full_name)]];
 
@@ -79,50 +60,61 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
   );
   const foot = [["Days present", ...totals.map(String)]];
 
-  // Parallel grid of statuses so didParseCell can colour without re-deriving.
-  const kinds = matrix.map((row) => row.cells.map((c) => fillFor(c.status)));
+  // Shrink type/padding until every date row fits one page, down to a floor
+  // where it would stop being readable; past that it paginates as normal.
+  const PT_MM = 0.3528;
+  const LINE = 1.15;
+  const avail = pageH - tableTop - tableBottom;
+  const rowCount = body.length + 2; // + header + totals
+  let fontSize = 7.5;
+  let cellPadding = 1.5;
+  const rowHeight = () => fontSize * PT_MM * LINE + cellPadding * 2;
+  while (rowCount * rowHeight() > avail && fontSize > 4.6) {
+    fontSize -= 0.1;
+    cellPadding = Math.max(0.35, cellPadding - 0.045);
+  }
+  const dateColW = fontSize < 6 ? 16 : 19;
+  const bodyW = pageW - margin * 2 - dateColW;
+  const colW = bodyW / Math.max(employees.length, 1);
 
   autoTable(doc, {
     head,
     body,
     foot,
-    startY: margin + 14,
+    startY: tableTop,
     // top applies to continuation pages; without it the table would be drawn
     // over the header band that didDrawPage stamps on every page.
-    margin: { top: margin + 14, left: margin, right: margin, bottom: margin + 10 },
+    margin: { top: tableTop, left: margin, right: margin, bottom: tableBottom },
     theme: "grid",
     showFoot: "lastPage",
     styles: {
       font: "helvetica",
-      fontSize: employees.length > 10 ? 6 : 7,
-      cellPadding: 1.6,
+      fontSize,
+      cellPadding,
       halign: "center",
       valign: "middle",
       textColor: INK,
-      lineColor: [226, 232, 240],
+      lineColor: RULE,
       lineWidth: 0.1,
       overflow: "linebreak",
     },
     headStyles: {
-      fillColor: BLUE,
+      fillColor: HEAD,
       textColor: [255, 255, 255],
       fontStyle: "bold",
       halign: "center",
-      fontSize: employees.length > 10 ? 6 : 7,
+      fontSize: Math.min(fontSize, 6.8),
+      cellPadding: Math.max(cellPadding, 1),
     },
     footStyles: {
-      fillColor: [241, 245, 249],
+      fillColor: FOOT,
       textColor: INK,
       fontStyle: "bold",
       halign: "center",
     },
     columnStyles: {
-      0: { halign: "left", cellWidth: 22, fontStyle: "bold" },
-    },
-    didParseCell: (data) => {
-      if (data.section !== "body" || data.column.index === 0) return;
-      const fill = kinds[data.row.index]?.[data.column.index - 1];
-      if (fill) data.cell.styles.fillColor = fill;
+      0: { halign: "left", cellWidth: dateColW, fontStyle: "bold" },
+      ...Object.fromEntries(employees.map((_, i) => [i + 1, { cellWidth: colW }])),
     },
     didDrawPage: () => {
       // Header band, repeated on every page.
@@ -141,31 +133,13 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
     },
   });
 
-  // Legend under the table, on whatever page it ended on.
-  let y = (doc.lastAutoTable?.finalY ?? margin) + 7;
-  if (y > pageH - 18) {
-    doc.addPage();
-    y = margin + 18;
-  }
-  const legend = [
-    ["Present", FILL.present],
-    ["Late", FILL.late],
-    ["Half day", FILL.halfDay],
-    ["Absent", FILL.absent],
-    ["Non-working", FILL.off],
-  ];
-  let x = margin;
+  // Legend under the table, on whatever page it ended on. Clamped into the
+  // bottom margin the table already reserves, so a table that runs to the foot
+  // of the page never pushes a legend-only page after it.
+  const y = Math.min((doc.lastAutoTable?.finalY ?? margin) + 6, pageH - 13);
   doc.setFontSize(7.5);
-  for (const [text, fill] of legend) {
-    doc.setFillColor(...fill);
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(x, y - 2.6, 3.4, 3.4, "FD");
-    doc.setTextColor(...INK);
-    doc.text(text, x + 4.6, y);
-    x += doc.getTextWidth(text) + 11;
-  }
   doc.setTextColor(...GRAY);
-  doc.text("*  no check-out recorded", x, y);
+  doc.text("\u2014  non-working day        *  no check-out recorded", margin, y);
 
   // Page numbers last: the total is only known once every page exists.
   const pageCount = doc.internal.getNumberOfPages();
