@@ -9,6 +9,15 @@ import { daysInRange } from "../../dateRanges";
 // and rolls the date back a day for anyone east of Greenwich.
 const isoDate = (d) => dayKey(d);
 
+// PocketBase stores and compares timestamps in UTC, so a local calendar day
+// has to be converted before it goes into a filter. Pasting the local date in
+// raw offsets every boundary by the timezone — in IST that hides a punch made
+// between 00:00 and 05:29 from its own day.
+const utcBound = (day, endOfDay) =>
+  new Date(`${day}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    .toISOString()
+    .replace("T", " ");
+
 const csvRow = (cells) =>
   cells
     .map((c) => {
@@ -39,8 +48,9 @@ export default function Report() {
   const load = async (f = from, t = to) => {
     setLoading(true);
     try {
-      // Inclusive range: from 00:00:00 to 23:59:59 of the selected days.
-      const filter = `timestamp >= "${f} 00:00:00" && timestamp <= "${t} 23:59:59"`;
+      // Inclusive range: local midnight of `f` to local end-of-day of `t`,
+      // expressed in UTC so the bounds line up with the stored timestamps.
+      const filter = `timestamp >= "${utcBound(f, false)}" && timestamp <= "${utcBound(t, true)}"`;
       const [items, emps, sets] = await Promise.all([
         pb.collection("attendance_records").getFullList({
           filter,
