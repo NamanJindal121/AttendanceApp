@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Download, FileDown, Table2, List } from "lucide-react";
 import { pb } from "../../pb";
 import DateRangePicker from "../../DateRangePicker";
@@ -45,9 +45,17 @@ export default function Report() {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState("log"); // "log" | "matrix"
   const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Identifies the newest in-flight load. The PocketBase SDK auto-cancels a
+  // duplicate request, and a superseded one must not clobber the state (or
+  // raise an error) belonging to the request that replaced it.
+  const reqId = useRef(0);
 
   const load = async (f = from, t = to) => {
+    const id = ++reqId.current;
     setLoading(true);
+    setError("");
     try {
       // Inclusive range: local midnight of `f` to local end-of-day of `t`,
       // expressed in UTC so the bounds line up with the stored timestamps.
@@ -64,13 +72,20 @@ export default function Report() {
         }),
         pb.collection("settings").getFullList({ limit: 1 }),
       ]);
+      if (id !== reqId.current) return;
       setRows(items);
       setEmployees(emps);
       setSettings(sets[0] || null);
-    } catch (_) {
+    } catch (err) {
+      // An auto-cancelled or superseded request is not a failure.
+      if (err?.isAbort || id !== reqId.current) return;
+      // Never fall through to a rendered table on failure: an empty result set
+      // draws the consolidated view as every employee absent on every date,
+      // which is indistinguishable from a real month of absences.
       setRows([]);
+      setError("Could not load attendance for this range. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   };
 
@@ -114,6 +129,10 @@ export default function Report() {
       try {
         const { exportMatrixPdf } = await import("../../reportPdf");
         exportMatrixPdf({ matrix, employees, from, to });
+      } catch (_) {
+        // The exporter is deliberately not precached by the service worker, so
+        // this is the expected failure when offline.
+        setError("Could not load the PDF exporter. It needs a connection the first time it is used.");
       } finally {
         setExporting(false);
       }
@@ -151,7 +170,9 @@ export default function Report() {
         </button>
       </div>
 
-      {view === "matrix" ? (
+      {error ? (
+        <p className="error">{error}</p>
+      ) : view === "matrix" ? (
         <ConsolidatedTable matrix={matrix} employees={employees} loading={loading} />
       ) : (
         <PunchLog rows={rows} />

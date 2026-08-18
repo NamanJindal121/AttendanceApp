@@ -45,13 +45,6 @@ export const PRESETS = [
   { key: "last90", label: "Last 90 days", range: (t) => [addDays(t, -89), t] },
 ];
 
-// Resolve a preset key to local "YYYY-MM-DD" strings.
-export function presetRange(key, today) {
-  const p = PRESETS.find((x) => x.key === key);
-  if (!p) return null;
-  const [a, b] = p.range(midnight(today));
-  return [dayKey(a), dayKey(b)];
-}
 
 // Every day from `from` to `to` inclusive, as local "YYYY-MM-DD" keys.
 export function daysInRange(from, to, cap = 400) {

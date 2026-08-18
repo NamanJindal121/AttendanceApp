@@ -28,7 +28,12 @@ export default function AttendanceCalendar() {
       .collection("attendance_records")
       .getFullList({ filter: `employee = "${empId}"`, sort: "-timestamp" })
       .then(setRecords)
-      .catch(() => setRecords([]));
+      .catch((err) => {
+        // The SDK auto-cancels a duplicate request; letting that clear the list
+        // would blank the calendar behind whichever request superseded it.
+        if (err?.isAbort) return;
+        setRecords([]);
+      });
 
   // Load the employee list + office settings once.
   useEffect(() => {
@@ -45,8 +50,11 @@ export default function AttendanceCalendar() {
       .catch(() => {});
   }, []);
 
-  // (Re)load the selected employee's attendance.
+  // (Re)load the selected employee's attendance. Any correction in progress
+  // belongs to the previous employee, so drop it rather than let it reappear
+  // if they switch back.
   useEffect(() => {
+    setEditing(null);
     if (selectedId) loadRecords(selectedId);
   }, [selectedId]);
 
