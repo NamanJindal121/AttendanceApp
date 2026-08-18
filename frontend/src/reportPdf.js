@@ -15,7 +15,7 @@ const GRAY = [110, 110, 110];
 // instead, which is what the grid of pages below is for.
 const FONT_SIZE = 7.5;
 const CELL_PADDING = 1.5;
-const DATE_COL_W = 19;
+const FOOT_LABEL = "Days present";
 
 const pretty = (key) => {
   const [y, m, d] = key.split("-").map(Number);
@@ -60,8 +60,8 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
   const tableTop = margin + 15;
   const tableBottom = margin + 8;
 
-  // How many employee columns fit at full size: measure the widest label that
-  // has to sit in one, rather than guessing a width.
+  // Column widths are measured in the real font rather than guessed, so a
+  // column is only ever as narrow as its content genuinely allows.
   doc.setFont("helvetica", "normal");
   doc.setFontSize(FONT_SIZE);
   let widest = 0;
@@ -74,8 +74,14 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
   for (const e of employees) {
     widest = Math.max(widest, doc.getTextWidth(e.full_name));
   }
+  // The date column has to hold both "Mon 20/07" and the bold footer label.
+  let dateW = doc.getTextWidth(FOOT_LABEL);
+  for (const row of matrix) {
+    dateW = Math.max(dateW, doc.getTextWidth(rowLabel(row.date)));
+  }
+  const dateColW = dateW + CELL_PADDING * 2 + 1;
   const minColW = widest + CELL_PADDING * 2 + 1.5;
-  const bodyW = pageW - margin * 2 - DATE_COL_W;
+  const bodyW = pageW - margin * 2 - dateColW;
   const colsPerPage = Math.max(1, Math.floor(bodyW / minColW));
   const colW = bodyW / colsPerPage;
 
@@ -138,13 +144,18 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
     autoTable(doc, {
       head,
       body,
-      foot: [["Days present", ...totals.map(String)]],
+      foot: [[FOOT_LABEL, ...totals.map(String)]],
       startY: tableTop,
       // top applies to continuation pages; without it the table would be drawn
       // over the header band that didDrawPage stamps on every page.
       margin: { top: tableTop, left: margin, right: margin, bottom: tableBottom },
       theme: "grid",
       showFoot: "lastPage",
+      // Columns are sized explicitly, so the table is exactly as wide as they
+      // make it. Without this autoTable tries to stretch it to the full page
+      // and complains it cannot, since no column is resizable — and a final
+      // part-full group would be stretched out of line with the others.
+      tableWidth: "wrap",
       styles: {
         font: "helvetica",
         fontSize: FONT_SIZE,
@@ -169,7 +180,7 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
         halign: "center",
       },
       columnStyles: {
-        0: { halign: "left", cellWidth: DATE_COL_W, fontStyle: "bold" },
+        0: { halign: "left", cellWidth: dateColW, fontStyle: "bold" },
         ...Object.fromEntries(
           group.list.map((_, i) => [i + 1, { cellWidth: colW }])
         ),
