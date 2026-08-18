@@ -912,3 +912,277 @@ button {
 .selfie-thumb:hover {
   border-color: var(--blue);
 }
+
+/* ---------------------------------------------------------------------------
+   Date range picker (Report filters)
+   Preset rail + two months + Apply/Cancel, in the app's own palette.
+--------------------------------------------------------------------------- */
+.drp {
+  position: relative;
+}
+.drp-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+.drp-pop {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  max-width: min(92vw, 780px);
+}
+.drp-rail {
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 0.5rem 0;
+  background: #f8fafc;
+  border-right: 1px solid var(--line);
+}
+.drp-preset {
+  text-align: left;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.drp-preset:hover:not(:disabled) {
+  background: #eef2f7;
+  transform: none;
+}
+.drp-preset.active {
+  background: #e0e7ff;
+  font-weight: 700;
+  color: var(--blue-dark);
+}
+.drp-main {
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem;
+  gap: 0.9rem;
+  min-width: 0;
+}
+.drp-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.drp-input {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+}
+.drp-input span {
+  font-size: 0.7rem;
+  color: var(--gray);
+}
+.drp-input strong {
+  font-size: 0.95rem;
+}
+.drp-dash {
+  color: var(--gray);
+}
+.drp-months {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  overflow-x: auto;
+}
+.drp-month {
+  min-width: 220px;
+}
+.drp-month-name {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gray);
+  margin-bottom: 0.5rem;
+}
+.drp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.drp-dow {
+  text-align: center;
+  font-size: 0.66rem;
+  color: var(--gray);
+  padding-bottom: 0.25rem;
+}
+.drp-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+.drp-day:hover:not(:disabled) {
+  background: #eef2f7;
+  transform: none;
+}
+.drp-day.empty {
+  visibility: hidden;
+}
+.drp-day.disabled,
+.drp-day:disabled {
+  color: #cbd5e1;
+  cursor: default;
+}
+.drp-day.in-range {
+  background: #e0e7ff;
+  border-radius: 0;
+}
+.drp-day.selected {
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+}
+.drp-day.range-start {
+  border-radius: 6px 0 0 6px;
+}
+.drp-day.range-end {
+  border-radius: 0 6px 6px 0;
+}
+.drp-nav {
+  align-self: center;
+}
+.drp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+button.ghost {
+  background: none;
+  color: var(--ink);
+  box-shadow: none;
+}
+button.ghost:hover:not(:disabled) {
+  background: #eef2f7;
+}
+@media (max-width: 720px) {
+  .drp-pop {
+    flex-direction: column;
+  }
+  .drp-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Consolidated report matrix — employees down, every day in range across.
+   Cell colours deliberately mirror .cal-cell so the two views read the same.
+--------------------------------------------------------------------------- */
+.table.matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: max-content;
+}
+.table.matrix th,
+.table.matrix td {
+  padding: 0.4rem 0.5rem;
+  white-space: nowrap;
+}
+.table.matrix .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.table.matrix thead .sticky-col {
+  z-index: 3;
+  background: #f8fafc;
+}
+.table.matrix tbody tr:hover .sticky-col {
+  background: #f8fafc;
+}
+.matrix-date {
+  text-align: center !important;
+  font-size: 0.65rem !important;
+}
+.matrix-date span {
+  display: block;
+}
+.matrix-dow {
+  color: #94a3b8;
+  font-weight: 400;
+}
+.matrix-cell {
+  text-align: center !important;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #334155;
+  border-right: 1px solid #f1f5f9;
+  min-width: 62px;
+}
+.matrix-cell.present {
+  background: #dcfce7;
+}
+.matrix-cell.present.is-late,
+.matrix-cell.present.is-shortfall {
+  background: #fef3c7;
+}
+.matrix-cell.present.is-half-day {
+  background: #ffedd5;
+}
+.matrix-cell.absent {
+  background: #fee2e2;
+}
+.matrix-cell.off {
+  background: #f1f5f9;
+}
+.matrix-cell.future {
+  background: #fff;
+}
+.dot.is-half-day {
+  background: #ffedd5;
+}
+.dot.is-shortfall {
+  background: #fef3c7;
+}
+
+/* Inline punch correction row in the admin calendar. */
+.row.editing {
+  background: #f8fafc;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.row.editing input,
+.row.editing select {
+  width: auto;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
