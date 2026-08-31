@@ -112,6 +112,7 @@ export default function Employees() {
         scheduled_check_out: isEditFreelancer ? "" : editing.scheduled_check_out,
         daily_hours: isEditFreelancer ? Number(editing.daily_hours) : 0,
         work_days: Array.isArray(editing.work_days) ? editing.work_days : [],
+        active: !!editing.active,
       };
       if (editing.aadhar_card instanceof File) {
         data.aadhar_card = editing.aadhar_card;
@@ -365,7 +366,17 @@ export default function Employees() {
                       <option value="admin">admin</option>
                     </select>
                   </td>
-                  <td>{emp.active ? "Yes" : "No"}</td>
+                  <td>
+                    <select
+                      value={editing.active ? "true" : "false"}
+                      onChange={(e) =>
+                        setEditing({ ...editing, active: e.target.value === "true" })
+                      }
+                    >
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </td>
                   <td>
                     <button className="link" onClick={saveEdit}>
                       <Check /> Save
