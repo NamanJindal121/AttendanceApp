@@ -52,12 +52,12 @@ const rowLabel = (key) => {
 // paginate; employees flow across and paginate too, so a roster wider than the
 // page becomes a further set of pages rather than being squeezed. The result is
 // an n x m grid: m column-groups of employees, each running n pages of dates.
-export function exportMatrixPdf({ matrix, employees, from, to }) {
+export function exportMatrixPdf({ matrix, employees, from, to, groupName }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 10;
-  const tableTop = margin + 15;
+  const tableTop = margin + (groupName ? 20 : 15);
   const tableBottom = margin + 8;
 
   // Column widths are measured in the real font rather than guessed, so a
@@ -99,11 +99,19 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
     doc.setFontSize(13);
     doc.setTextColor(...INK);
     doc.text("Attendance Report", margin, margin + 4);
+    let headerY = margin + 9.5;
+    if (groupName) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      doc.text(groupName, margin, margin + 9.5);
+      headerY = margin + 14.5;
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...GRAY);
-    doc.text(`${pretty(from)} — ${pretty(to)}`, margin, margin + 9.5);
+    doc.text(`${pretty(from)} — ${pretty(to)}`, margin, headerY);
 
     // Only worth saying when the roster actually spans more than one group.
     if (groups.length > 1) {
@@ -113,7 +121,7 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
       doc.text(label, pageW - margin - doc.getTextWidth(label), margin + 4);
     }
     const stamp = `Generated ${new Date().toLocaleString()}`;
-    doc.text(stamp, pageW - margin - doc.getTextWidth(stamp), margin + 9.5);
+    doc.text(stamp, pageW - margin - doc.getTextWidth(stamp), headerY);
 
     // Key, repeated on every page so no page is orphaned from its notation.
     doc.setFontSize(7.5);
@@ -200,5 +208,6 @@ export function exportMatrixPdf({ matrix, employees, from, to }) {
     doc.text(label, pageW - margin - doc.getTextWidth(label), pageH - 6);
   }
 
-  doc.save(`attendance_consolidated_${from}_${to}.pdf`);
+  const fileLabel = groupName ? `_${groupName.replace(/\s+/g, "_")}` : "";
+  doc.save(`attendance_consolidated${fileLabel}_${from}_${to}.pdf`);
 }

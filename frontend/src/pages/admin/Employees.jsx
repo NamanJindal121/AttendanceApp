@@ -8,6 +8,7 @@ const EMAIL_DOMAIN = "@jindal.biz";
 const BLANK = {
   username: "",
   full_name: "",
+  group: "",
   biometric_user_id: "",
   aadhar_card: null,
   role: "employee",
@@ -50,6 +51,7 @@ function DayPicker({ days, onChange }) {
 
 export default function Employees() {
   const [list, setList] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [form, setForm] = useState(BLANK);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null); // employee being edited (draft)
@@ -63,6 +65,7 @@ export default function Employees() {
 
   useEffect(() => {
     load();
+    pb.collection("groups").getFullList({ filter: "active = true", sort: "name" }).then(setGroups).catch(() => {});
   }, []);
 
   const create = async (e) => {
@@ -102,6 +105,7 @@ export default function Employees() {
       const isEditFreelancer = Number(editing.daily_hours || 0) > 0;
       const data = {
         full_name: editing.full_name,
+        group: editing.group || "",
         biometric_user_id: editing.biometric_user_id,
         role: editing.role,
         scheduled_check_in: isEditFreelancer ? "" : editing.scheduled_check_in,
@@ -129,6 +133,15 @@ export default function Employees() {
           onChange={(e) => setForm({ ...form, full_name: e.target.value })}
           required
         />
+        <select
+          value={form.group}
+          onChange={(e) => setForm({ ...form, group: e.target.value })}
+        >
+          <option value="">— No group —</option>
+          {groups.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
         <input
           placeholder="Username"
           value={form.username}
@@ -231,6 +244,7 @@ export default function Employees() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Group</th>
               <th>Username</th>
               <th>Biometric ID</th>
               <th>Aadhar Image</th>
@@ -252,6 +266,17 @@ export default function Employees() {
                         setEditing({ ...editing, full_name: e.target.value })
                       }
                     />
+                  </td>
+                  <td>
+                    <select
+                      value={editing.group || ""}
+                      onChange={(e) => setEditing({ ...editing, group: e.target.value })}
+                    >
+                      <option value="">— No group —</option>
+                      {groups.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
                   </td>
                   <td>{emp.username}</td>
                   <td>
@@ -353,6 +378,7 @@ export default function Employees() {
               ) : (
                 <tr key={emp.id}>
                   <td>{emp.full_name}</td>
+                  <td>{groups.find((b) => b.id === emp.group)?.name || <span className="muted">—</span>}</td>
                   <td>{emp.username}</td>
                   <td>{emp.biometric_user_id || "—"}</td>
                   <td>

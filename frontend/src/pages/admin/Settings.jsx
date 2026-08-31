@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapPin, Save } from "lucide-react";
+import { MapPin, Save, Building2, Plus, Pencil, Check, X } from "lucide-react";
 import { pb } from "../../pb";
 
 // Geofence configuration editor. Edits the single `settings` record that the
@@ -10,10 +10,20 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
+  const [groups, setGroups] = useState([]);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editGroupName, setEditGroupName] = useState("");
+
   useEffect(() => {
     pb.collection("settings")
       .getFullList({ limit: 1 })
       .then((items) => setRec(items[0] || null))
+      .catch(() => {});
+
+    pb.collection("groups")
+      .getFullList({ sort: "name" })
+      .then(setGroups)
       .catch(() => {});
   }, []);
 
@@ -50,8 +60,96 @@ export default function Settings() {
     }
   };
 
+  const addGroup = async (e) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    try {
+      const g = await pb.collection("groups").create({ name: newGroupName, active: true });
+      setGroups([...groups, g].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewGroupName("");
+    } catch (err) {
+      alert(err?.response?.message || "Failed to add group");
+    }
+  };
+
+  const toggleGroupActive = async (group) => {
+    try {
+      const g = await pb.collection("groups").update(group.id, { active: !group.active });
+      setGroups(groups.map((x) => (x.id === group.id ? g : x)));
+    } catch (err) {
+      alert("Failed to update status");
+    }
+  };
+
+  const saveGroupName = async (group) => {
+    if (!editGroupName.trim() || editGroupName === group.name) {
+      setEditingGroupId(null);
+      return;
+    }
+    try {
+      const g = await pb.collection("groups").update(group.id, { name: editGroupName });
+      setGroups(groups.map((x) => (x.id === group.id ? g : x)).sort((a, b) => a.name.localeCompare(b.name)));
+      setEditingGroupId(null);
+    } catch (err) {
+      alert(err?.response?.message || "Failed to update name");
+    }
+  };
+
   return (
     <div className="pad narrow">
+      <div className="groups-section">
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+          <Building2 size={20} /> Groups
+        </h2>
+        
+        <form onSubmit={addGroup} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <input 
+            type="text" 
+            placeholder="New group name" 
+            value={newGroupName} 
+            onChange={(e) => setNewGroupName(e.target.value)} 
+            style={{ flex: 1 }}
+          />
+          <button type="submit" disabled={!newGroupName.trim()}><Plus size={16} /> Add</button>
+        </form>
+
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {groups.map((group) => (
+            <li key={group.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', padding: '0.5rem', background: 'var(--surface-color, #f9f9f9)', borderRadius: '4px' }}>
+              {editingGroupId === group.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editGroupName}
+                    onChange={(e) => setEditGroupName(e.target.value)}
+                    style={{ flex: 1 }}
+                    autoFocus
+                  />
+                  <button className="icon" onClick={() => saveGroupName(group)}><Check size={16} /></button>
+                  <button className="icon" onClick={() => setEditingGroupId(null)}><X size={16} /></button>
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: 1, opacity: group.active ? 1 : 0.5 }}>{group.name}</span>
+                  <button 
+                    className={`toggle ${group.active ? "on" : ""}`}
+                    onClick={() => toggleGroupActive(group)}
+                    style={{ minWidth: '60px' }}
+                  >
+                    {group.active ? "Yes" : "No"}
+                  </button>
+                  <button className="icon" onClick={() => { setEditingGroupId(group.id); setEditGroupName(group.name); }}>
+                    <Pencil size={16} />
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <hr style={{ margin: '2rem 0' }} />
+
       <label>
         Office latitude
         <input

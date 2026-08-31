@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Download, FileDown, Table2, List } from "lucide-react";
+import { Search, Download, FileDown, Table2, List, Building2 } from "lucide-react";
 import { pb } from "../../pb";
 import DateRangePicker from "../../DateRangePicker";
 import { dayKey, dayStatus, groupByDay, statusText } from "../../attendance";
@@ -46,6 +46,8 @@ export default function Report() {
   const [view, setView] = useState("log"); // "log" | "matrix"
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
 
   // Identifies the newest in-flight load. The PocketBase SDK auto-cancels a
   // duplicate request, and a superseded one must not clobber the state (or
@@ -60,7 +62,7 @@ export default function Report() {
       // Inclusive range: local midnight of `f` to local end-of-day of `t`,
       // expressed in UTC so the bounds line up with the stored timestamps.
       const filter = `timestamp >= "${utcBound(f, false)}" && timestamp <= "${utcBound(t, true)}"`;
-      const [items, emps, sets] = await Promise.all([
+      const [items, emps, sets, grps] = await Promise.all([
         pb.collection("attendance_records").getFullList({
           filter,
           sort: "-timestamp",
@@ -71,11 +73,13 @@ export default function Report() {
           sort: "full_name",
         }),
         pb.collection("settings").getFullList({ limit: 1 }),
+        pb.collection("groups").getFullList({ filter: "active = true", sort: "name" }),
       ]);
       if (id !== reqId.current) return;
       setRows(items);
       setEmployees(emps);
       setSettings(sets[0] || null);
+      setGroups(grps);
     } catch (err) {
       // An auto-cancelled or superseded request is not a failure.
       if (err?.isAbort || id !== reqId.current) return;
@@ -102,24 +106,35 @@ export default function Report() {
 
   const dates = useMemo(() => daysInRange(from, to), [from, to]);
 
+  const filteredEmployees = useMemo(() => {
+    if (!selectedGroup) return employees;
+    return employees.filter((e) => e.group === selectedGroup);
+  }, [employees, selectedGroup]);
+
+  const filteredRows = useMemo(() => {
+    if (!selectedGroup) return rows;
+    const empIds = new Set(filteredEmployees.map((e) => e.id));
+    return rows.filter((r) => empIds.has(r.employee));
+  }, [rows, filteredEmployees, selectedGroup]);
+
   // One row per date, one column per employee. Statuses come from the same
   // dayStatus() the month calendar uses, so the values match it exactly.
   const matrix = useMemo(() => {
-    if (!settings || employees.length === 0) return [];
+    if (!settings || filteredEmployees.length === 0) return [];
     const byEmp = {};
-    for (const r of rows) {
+    for (const r of filteredRows) {
       (byEmp[r.employee] ||= []).push(r);
     }
-    const byDayPerEmp = employees.map((emp) => groupByDay(byEmp[emp.id] || []));
+    const byDayPerEmp = filteredEmployees.map((emp) => groupByDay(byEmp[emp.id] || []));
     const today = new Date();
     return dates.map((d) => ({
       date: d,
-      cells: employees.map((emp, i) => ({
+      cells: filteredEmployees.map((emp, i) => ({
         employeeId: emp.id,
         status: dayStatus(d, byDayPerEmp[i][d], emp, settings, today),
       })),
     }));
-  }, [rows, employees, settings, dates]);
+  }, [filteredRows, filteredEmployees, settings, dates]);
 
   const doExport = async () => {
     if (view === "matrix") {
@@ -128,7 +143,10 @@ export default function Report() {
       setExporting(true);
       try {
         const { exportMatrixPdf } = await import("../../reportPdf");
-        exportMatrixPdf({ matrix, employees, from, to });
+        const groupName = selectedGroup
+          ? groups.find((g) => g.id === selectedGroup)?.name || ""
+          : "";
+        exportMatrixPdf({ matrix, employees: filteredEmployees, from, to, groupName });
       } catch (_) {
         // The exporter is deliberately not precached by the service worker, so
         // this is the expected failure when offline.
@@ -139,7 +157,7 @@ export default function Report() {
       return;
     }
     const header = csvRow(["employee", "type", "timestamp", "source", "flagged"]);
-    const lines = rows.map((r) =>
+    const lines = filteredRows.map((r) =>
       csvRow([
         r.expand?.employee?.full_name || r.employee,
         r.type,
@@ -151,11 +169,23 @@ export default function Report() {
     download(`attendance_${from}_${to}.csv`, [header, ...lines].join("\n"));
   };
 
-  const empty = view === "matrix" ? matrix.length === 0 : rows.length === 0;
+  const empty = view === "matrix" ? matrix.length === 0 : filteredRows.length === 0;
 
   return (
     <div className="pad">
       <div className="filters">
+        {groups.length > 0 && (
+          <select
+            className="group-filter"
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+          >
+            <option value="">All</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+        )}
         <DateRangePicker from={from} to={to} onApply={applyRange} />
         <button onClick={() => load()} disabled={loading}>
           <Search /> {loading ? "…" : "Refresh"}
@@ -173,9 +203,9 @@ export default function Report() {
       {error ? (
         <p className="error">{error}</p>
       ) : view === "matrix" ? (
-        <ConsolidatedTable matrix={matrix} employees={employees} loading={loading} />
+        <ConsolidatedTable matrix={matrix} employees={filteredEmployees} loading={loading} />
       ) : (
-        <PunchLog rows={rows} />
+        <PunchLog rows={filteredRows} />
       )}
     </div>
   );

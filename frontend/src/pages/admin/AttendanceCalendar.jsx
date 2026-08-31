@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, PencilLine, Pencil, Check, X } from "lucide-react";
 import { pb } from "../../pb";
 import Calendar from "../../Calendar";
@@ -9,6 +9,8 @@ import { dayKey } from "../../attendance";
 // manual records post directly to the attendance_records collection.
 export default function AttendanceCalendar() {
   const [employees, setEmployees] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [settings, setSettings] = useState(null);
   const [records, setRecords] = useState([]);
@@ -37,6 +39,10 @@ export default function AttendanceCalendar() {
 
   // Load the employee list + office settings once.
   useEffect(() => {
+    pb.collection("groups")
+      .getFullList({ filter: "active = true", sort: "name" })
+      .then(setGroups)
+      .catch(() => {});
     pb.collection("employees")
       .getFullList({ filter: "active = true", sort: "full_name" })
       .then((list) => {
@@ -57,6 +63,17 @@ export default function AttendanceCalendar() {
     setEditing(null);
     if (selectedId) loadRecords(selectedId);
   }, [selectedId]);
+
+  const filteredEmployees = useMemo(() => {
+    if (!selectedGroup) return employees;
+    return employees.filter((e) => e.group === selectedGroup);
+  }, [employees, selectedGroup]);
+
+  useEffect(() => {
+    if (filteredEmployees.length > 0 && !filteredEmployees.find((e) => e.id === selectedId)) {
+      setSelectedId(filteredEmployees[0].id);
+    }
+  }, [filteredEmployees, selectedId]);
 
   const selected = employees.find((e) => e.id === selectedId);
 
@@ -132,13 +149,27 @@ export default function AttendanceCalendar() {
   return (
     <div className="pad">
       <div className="filters">
+        {groups.length > 0 && (
+          <label className="field">
+            Group
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+            >
+              <option value="">All</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           Employee
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
           >
-            {employees.map((emp) => (
+            {filteredEmployees.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.full_name}
               </option>
